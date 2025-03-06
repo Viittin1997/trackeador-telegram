@@ -257,6 +257,16 @@ body {
   font-family: monospace;
 }
 
+.form-instructions a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.form-instructions a:hover {
+  text-decoration: underline;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;

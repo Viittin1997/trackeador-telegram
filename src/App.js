@@ -134,12 +134,47 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
         </div>
       )}
       
+      {/* Campo Token API do Meta com instruções */}
+      {renderFieldWithInstructions(
+        'token_api',
+        'Token API do Meta',
+        <div>
+          <p>Para obter o Token API do Meta associado ao Pixel:</p>
+          <ol>
+            <li>Acesse o <a href="https://business.facebook.com/events_manager" target="_blank" rel="noopener noreferrer">Gerenciador de Eventos do Facebook</a></li>
+            <li>Selecione o Pixel ID desejado</li>
+            <li>Clique em "Configurações" no menu lateral</li>
+            <li>Role até a seção "Token de Acesso"</li>
+            <li>Crie um novo token ou use um existente</li>
+            <li>Copie o token gerado e cole neste campo</li>
+          </ol>
+          <p><strong>Importante:</strong> Este token é necessário para registrar as conversões no Meta Ads.</p>
+        </div>
+      )}
+      
+      {/* Campo Pixel ID com instruções */}
+      {renderFieldWithInstructions(
+        'pixel_id',
+        'Pixel ID',
+        <div>
+          <p>Para encontrar seu Pixel ID:</p>
+          <ol>
+            <li>Acesse o <a href="https://business.facebook.com/events_manager" target="_blank" rel="noopener noreferrer">Gerenciador de Eventos do Facebook</a></li>
+            <li>Selecione o pixel desejado</li>
+            <li>O ID do pixel será exibido no topo da página ou em "Configurações"</li>
+            <li>É um número de 16 dígitos (exemplo: <code>1234567890123456</code>)</li>
+          </ol>
+        </div>
+      )}
+      
       {/* Outros campos do formulário */}
       {Object.keys(formData)
         .filter(key => 
           key !== 'id' && 
           key !== 'quantidade_entrada' && 
           key !== 'id_channel_telegram' && 
+          key !== 'token_api' &&
+          key !== 'pixel_id' &&
           key !== 'entrada_total_grupo' && 
           key !== 'saidas_totais' && 
           key !== 'saidas_que_usaram_link'
