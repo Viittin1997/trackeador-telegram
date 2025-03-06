@@ -85,6 +85,7 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
     group_name: '',
     token_api: '',
     pixel_id: '',
+    id_channel_telegram: '',
     ...initialData
   });
 
@@ -98,23 +99,66 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
     onSubmit(formData);
   };
 
+  // Função para renderizar campos com instruções especiais
+  const renderFieldWithInstructions = (field, label, instructions) => {
+    return (
+      <div className="form-group" key={field}>
+        <label className="form-label">{label}</label>
+        <input
+          type="text"
+          name={field}
+          className="form-input"
+          value={formData[field] || ''}
+          onChange={handleChange}
+          required
+        />
+        {instructions && <div className="form-instructions">{instructions}</div>}
+      </div>
+    );
+  };
+
   return (
     <form onSubmit={handleSubmit}>
-      {Object.keys(formData).filter(key => key !== 'id' && key !== 'quantidade_entrada').map((field) => (
-        <div className="form-group" key={field}>
-          <label className="form-label">
-            {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-          </label>
-          <input
-            type="text"
-            name={field}
-            className="form-input"
-            value={formData[field] || ''}
-            onChange={handleChange}
-            required
-          />
+      {/* Campo ID do Canal Telegram com instruções */}
+      {renderFieldWithInstructions(
+        'id_channel_telegram',
+        'ID do Canal Telegram',
+        <div>
+          <p>Para obter o ID do canal:</p>
+          <ol>
+            <li>Abra o Telegram Web no computador</li>
+            <li>Acesse o grupo/canal desejado</li>
+            <li>O ID estará na URL do navegador</li>
+            <li>Exemplo: <code>-1002156853392</code> (inclua o sinal de menos)</li>
+          </ol>
         </div>
-      ))}
+      )}
+      
+      {/* Outros campos do formulário */}
+      {Object.keys(formData)
+        .filter(key => 
+          key !== 'id' && 
+          key !== 'quantidade_entrada' && 
+          key !== 'id_channel_telegram' && 
+          key !== 'entrada_total_grupo' && 
+          key !== 'saidas_totais' && 
+          key !== 'saidas_que_usaram_link'
+        )
+        .map((field) => (
+          <div className="form-group" key={field}>
+            <label className="form-label">
+              {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </label>
+            <input
+              type="text"
+              name={field}
+              className="form-input"
+              value={formData[field] || ''}
+              onChange={handleChange}
+              required
+            />
+          </div>
+        ))}
       <button type="submit" className="button">
         {buttonText}
       </button>
@@ -128,7 +172,13 @@ const CadastroForm = ({ onCadastroSuccess }) => {
     try {
       const { error } = await supabase
         .from('bravobet_links_personalizados')
-        .insert([{ ...formData, quantidade_entrada: 0 }]);
+        .insert([{ 
+          ...formData, 
+          quantidade_entrada: 0,
+          entrada_total_grupo: 0,
+          saidas_totais: 0,
+          saidas_que_usaram_link: 0
+        }]);
 
       if (error) throw error;
       alert('Link cadastrado com sucesso!');
@@ -239,13 +289,28 @@ const Dashboard = () => {
               </div>
               
               <div className="card-stats">
-                <span>Entradas:</span>
-                <span style={{ color: '#34a853', fontWeight: 'bold' }}>{link.quantidade_entrada}</span>
+                <div className="stats-row">
+                  <span>Entradas pelo link:</span>
+                  <span style={{ color: '#34a853', fontWeight: 'bold' }}>{link.quantidade_entrada || 0}</span>
+                </div>
+                <div className="stats-row">
+                  <span>Entradas totais:</span>
+                  <span style={{ color: '#4285F4', fontWeight: 'bold' }}>{link.entrada_total_grupo || 0}</span>
+                </div>
+                <div className="stats-row">
+                  <span>Saídas totais:</span>
+                  <span style={{ color: '#EA4335', fontWeight: 'bold' }}>{link.saidas_totais || 0}</span>
+                </div>
+                <div className="stats-row">
+                  <span>Saídas de usuários que usaram o link:</span>
+                  <span style={{ color: '#FBBC05', fontWeight: 'bold' }}>{link.saidas_que_usaram_link || 0}</span>
+                </div>
               </div>
               
               <div className="card-content">
                 <p><strong>Nome:</strong> {link.nome_link}</p>
                 <p><strong>Link:</strong> {link.link}</p>
+                <p><strong>ID do Canal:</strong> {link.id_channel_telegram || 'Não definido'}</p>
                 <p><strong>Pixel ID:</strong> {link.pixel_id}</p>
               </div>
 
