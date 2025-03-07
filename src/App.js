@@ -348,9 +348,12 @@ const Dashboard = () => {
 
   const handleUpdate = async (formData) => {
     try {
+      // Remover campos que não existem na tabela
+      const { lead_count, ...dataToUpdate } = formData;
+      
       const { error } = await supabase
         .from('bravobet_links_personalizados')
-        .update(formData)
+        .update(dataToUpdate)
         .eq('id', formData.id);
 
       if (error) throw error;
