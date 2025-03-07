@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import './styles.css';
 
@@ -306,7 +306,7 @@ const Dashboard = () => {
   // Mudar de página
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-  const fetchLinks = async () => {
+  const fetchLinks = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -336,11 +336,11 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchLinks();
-  }, []);
+  }, [fetchLinks]);
 
   const handleEdit = (link) => {
     setEditingLink(link);
@@ -395,7 +395,7 @@ const Dashboard = () => {
   };
 
   // Calcular estatísticas para o link selecionado
-  const calculateStats = (link) => {
+  const calculateStats = useCallback((link) => {
     // Porcentagem de entradas pelo link em relação às entradas totais
     const entryPercentage = link.entrada_total_grupo > 0 
       ? ((link.quantidade_entrada / link.entrada_total_grupo) * 100).toFixed(2)
@@ -436,10 +436,10 @@ const Dashboard = () => {
       exitColor,
       dailyColor
     };
-  };
+  }, []);
 
   // Função para determinar cor com base no desempenho
-  const getColorByPerformance = (value, higherIsBetter, reference = 50) => {
+  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
     const numValue = parseFloat(value);
     
     if (higherIsBetter) {
@@ -455,7 +455,7 @@ const Dashboard = () => {
       if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
       return '#EA4335'; // Vermelho - Precisa melhorar
     }
-  };
+  }, []);
 
   return (
     <div className="dashboard-container">
@@ -711,7 +711,6 @@ const Dashboard = () => {
 
 // Componente de Estatísticas Gerais
 const EstatisticasGerais = () => {
-  const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalLinks: 0,
@@ -724,44 +723,7 @@ const EstatisticasGerais = () => {
     groupStats: []
   });
 
-  useEffect(() => {
-    fetchLinks();
-  }, []);
-
-  const fetchLinks = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('bravobet_links_personalizados')
-        .select('*');
-
-      if (error) throw error;
-      
-      // Buscar contagem de leads para cada link
-      const linksWithLeadCount = await Promise.all(data.map(async (link) => {
-        const { count, error: countError } = await supabase
-          .from('bravobet_leads_telegram')
-          .select('id', { count: 'exact', head: true })
-          .eq('nome_invite_link_usado', link.nome_link);
-          
-        if (countError) {
-          console.error('Erro ao buscar contagem de leads:', countError.message);
-          return { ...link, lead_count: 0 };
-        }
-        
-        return { ...link, lead_count: count || 0 };
-      }));
-      
-      setLinks(linksWithLeadCount || []);
-      calculateStats(linksWithLeadCount || []);
-    } catch (error) {
-      console.error('Erro ao buscar links:', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateStats = (linksData) => {
+  const calculateStats = useCallback((linksData) => {
     // Estatísticas totais
     const totalLinks = linksData.length;
     const totalEntradas = linksData.reduce((sum, link) => sum + (link.quantidade_entrada || 0), 0);
@@ -836,7 +798,43 @@ const EstatisticasGerais = () => {
       expertStats,
       groupStats
     });
-  };
+  }, []);
+
+  const fetchLinks = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('bravobet_links_personalizados')
+        .select('*');
+
+      if (error) throw error;
+      
+      // Buscar contagem de leads para cada link
+      const linksWithLeadCount = await Promise.all(data.map(async (link) => {
+        const { count, error: countError } = await supabase
+          .from('bravobet_leads_telegram')
+          .select('id', { count: 'exact', head: true })
+          .eq('nome_invite_link_usado', link.nome_link);
+          
+        if (countError) {
+          console.error('Erro ao buscar contagem de leads:', countError.message);
+          return { ...link, lead_count: 0 };
+        }
+        
+        return { ...link, lead_count: count || 0 };
+      }));
+      
+      calculateStats(linksWithLeadCount || []);
+    } catch (error) {
+      console.error('Erro ao buscar links:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [calculateStats]);
+
+  useEffect(() => {
+    fetchLinks();
+  }, [fetchLinks]);
 
   // Calcular porcentagens e taxas
   const calcularTaxaConversao = () => {
@@ -852,7 +850,7 @@ const EstatisticasGerais = () => {
   };
 
   // Função para determinar cor com base no desempenho
-  const getColorByPerformance = (value, higherIsBetter, reference = 50) => {
+  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
     const numValue = parseFloat(value);
     
     if (higherIsBetter) {
@@ -868,7 +866,7 @@ const EstatisticasGerais = () => {
       if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
       return '#EA4335'; // Vermelho - Precisa melhorar
     }
-  };
+  }, []);
 
   return (
     <div className="dashboard-container">
