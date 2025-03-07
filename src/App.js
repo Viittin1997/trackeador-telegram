@@ -167,6 +167,35 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
         </div>
       )}
       
+      {/* Campo Nome do Link com instruções */}
+      {renderFieldWithInstructions(
+        'nome_link',
+        'Nome do Link',
+        <div>
+          <p>Especificação para nome do link no Telegram:</p>
+          <ol>
+            <li>Ao criar um link de convite personalizado no Telegram, você precisa definir um nome único</li>
+            <li>Recomendamos seguir o padrão: <code>bot_[apelido do expert]_[local onde está]</code></li>
+            <li>Exemplo: <code>bot_llaviator_lpviittin</code></li>
+          </ol>
+          <p><strong>Importante:</strong> Este nome deve ser único no Telegram.</p>
+        </div>
+      )}
+      
+      {/* Campo Nome do Grupo com instruções */}
+      {renderFieldWithInstructions(
+        'group_name',
+        'Nome do Grupo',
+        <div>
+          <p>Instruções para o nome do grupo:</p>
+          <ul>
+            <li>O ideal é utilizar o nome exato do grupo do Telegram</li>
+            <li>Este campo não precisa ser único, pois podem existir vários links para o mesmo grupo</li>
+            <li>Serve principalmente para identificação e organização dos links</li>
+          </ul>
+        </div>
+      )}
+      
       {/* Outros campos do formulário */}
       {Object.keys(formData)
         .filter(key => 
@@ -177,7 +206,9 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
           key !== 'pixel_id' &&
           key !== 'entrada_total_grupo' && 
           key !== 'saidas_totais' && 
-          key !== 'saidas_que_usaram_link'
+          key !== 'saidas_que_usaram_link' &&
+          key !== 'nome_link' &&
+          key !== 'group_name'
         )
         .map((field) => (
           <div className="form-group" key={field}>
@@ -212,7 +243,8 @@ const CadastroForm = ({ onCadastroSuccess }) => {
           quantidade_entrada: 0,
           entrada_total_grupo: 0,
           saidas_totais: 0,
-          saidas_que_usaram_link: 0
+          saidas_que_usaram_link: 0,
+          created_at: new Date().toISOString()
         }]);
 
       if (error) throw error;
@@ -234,10 +266,32 @@ const CadastroForm = ({ onCadastroSuccess }) => {
 // Componente de Dashboard
 const Dashboard = () => {
   const [links, setLinks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [editingLink, setEditingLink] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [linkToDelete, setLinkToDelete] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
+  const [selectedLinkStats, setSelectedLinkStats] = useState(null);
+  const linksPerPage = 10;
+
+  // Filtrar links com base no termo de busca
+  const filteredLinks = links.filter(link => 
+    link.nome_link.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    link.expert_apelido.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Calcular links para a página atual
+  const indexOfLastLink = currentPage * linksPerPage;
+  const indexOfFirstLink = indexOfLastLink - linksPerPage;
+  const currentLinks = filteredLinks.slice(indexOfFirstLink, indexOfLastLink);
+  
+  // Calcular número total de páginas
+  const totalPages = Math.ceil(filteredLinks.length / linksPerPage);
+
+  // Mudar de página
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const fetchLinks = async () => {
     try {
@@ -247,7 +301,23 @@ const Dashboard = () => {
         .select('*');
 
       if (error) throw error;
-      setLinks(data || []);
+      
+      // Buscar contagem de leads para cada link
+      const linksWithLeadCount = await Promise.all(data.map(async (link) => {
+        const { count, error: countError } = await supabase
+          .from('bravobet_leads_telegram')
+          .select('id', { count: 'exact', head: true })
+          .eq('nome_invite_link_usado', link.nome_link);
+          
+        if (countError) {
+          console.error('Erro ao buscar contagem de leads:', countError.message);
+          return { ...link, lead_count: 0 };
+        }
+        
+        return { ...link, lead_count: count || 0 };
+      }));
+      
+      setLinks(linksWithLeadCount || []);
     } catch (error) {
       console.error('Erro ao buscar links:', error.message);
     } finally {
@@ -303,79 +373,205 @@ const Dashboard = () => {
     }
   };
 
+  const handleStatsClick = (link) => {
+    setSelectedLinkStats(link);
+    setStatsModalOpen(true);
+  };
+
+  // Calcular estatísticas para o link selecionado
+  const calculateStats = (link) => {
+    // Porcentagem de entradas pelo link em relação às entradas totais
+    const entryPercentage = link.entrada_total_grupo > 0 
+      ? ((link.quantidade_entrada / link.entrada_total_grupo) * 100).toFixed(2)
+      : 0;
+    
+    // Relação de pessoas que saem que entraram pelo link vs saídas totais
+    const exitRatio = link.saidas_totais > 0
+      ? ((link.saidas_que_usaram_link / link.saidas_totais) * 100).toFixed(2)
+      : 0;
+    
+    // Média de entradas por dia
+    let entriesPerDay = 0;
+    if (link.created_at) {
+      const creationDate = new Date(link.created_at);
+      const currentDate = new Date();
+      const diffTime = Math.abs(currentDate - creationDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      entriesPerDay = diffDays > 0 
+        ? (link.quantidade_entrada / diffDays).toFixed(2)
+        : link.quantidade_entrada;
+    }
+    
+    // Determinar cores com base no desempenho
+    // Para entradas: quanto maior a porcentagem, melhor (verde = bom)
+    const entryColor = getColorByPerformance(entryPercentage, true);
+    
+    // Para saídas: quanto menor a porcentagem, melhor (verde = bom)
+    const exitColor = getColorByPerformance(exitRatio, false);
+    
+    // Para média diária: valores mais altos são melhores
+    const dailyColor = getColorByPerformance(entriesPerDay, true, 5); // 5 é um valor de referência
+    
+    return {
+      entryPercentage,
+      exitRatio,
+      entriesPerDay,
+      entryColor,
+      exitColor,
+      dailyColor
+    };
+  };
+
+  // Função para determinar cor com base no desempenho
+  const getColorByPerformance = (value, higherIsBetter, reference = 50) => {
+    const numValue = parseFloat(value);
+    
+    if (higherIsBetter) {
+      // Quanto maior o valor, melhor o desempenho
+      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
+      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
+      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    } else {
+      // Quanto menor o valor, melhor o desempenho
+      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
+      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
+      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    }
+  };
+
   return (
-    <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0 }}>Trackeador Telegram - BravoBet</h2>
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h2>Dashboard de Links</h2>
         <button onClick={fetchLinks} className="button button-update">
           Atualizar Dados
         </button>
       </div>
 
+      {/* Barra de busca */}
+      <div className="search-container">
+        <input
+          type="text"
+          placeholder="Buscar por nome do link ou apelido do expert..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(1); // Resetar para a primeira página ao buscar
+          }}
+          className="search-input"
+        />
+      </div>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '20px' }}>Carregando...</div>
       ) : (
-        <div className="cards-grid">
-          {links.map((link) => (
-            <div key={link.id} className="card">
-              <div className="card-header">
-                <h3 className="card-title">{link.group_name}</h3>
-                <p className="card-subtitle">Expert: {link.expert_apelido}</p>
-              </div>
-              
-              <div className="card-stats">
-                <div className="stats-row">
-                  <span>Entradas pelo link:</span>
-                  <span style={{ color: '#34a853', fontWeight: 'bold' }}>{link.quantidade_entrada || 0}</span>
+        <>
+          <div className="cards-grid">
+            {currentLinks.map((link) => (
+              <div key={link.id} className="card">
+                <div className="card-header">
+                  <h3 className="card-title">{link.group_name}</h3>
+                  <p className="card-subtitle">Expert: {link.expert_apelido}</p>
                 </div>
-                <div className="stats-row">
-                  <span>Entradas totais:</span>
-                  <span style={{ color: '#4285F4', fontWeight: 'bold' }}>{link.entrada_total_grupo || 0}</span>
+                
+                <div className="card-stats">
+                  <div className="stats-row">
+                    <span>Entradas pelo link:</span>
+                    <span style={{ color: '#34a853', fontWeight: 'bold' }}>{link.quantidade_entrada || 0}</span>
+                  </div>
+                  <div className="stats-row">
+                    <span>Entradas totais:</span>
+                    <span style={{ color: '#4285F4', fontWeight: 'bold' }}>{link.entrada_total_grupo || 0}</span>
+                  </div>
+                  <div className="stats-row">
+                    <span>Saídas totais:</span>
+                    <span style={{ color: '#EA4335', fontWeight: 'bold' }}>{link.saidas_totais || 0}</span>
+                  </div>
+                  <div className="stats-row">
+                    <span>Saídas de usuários que usaram o link:</span>
+                    <span style={{ color: '#FBBC05', fontWeight: 'bold' }}>{link.saidas_que_usaram_link || 0}</span>
+                  </div>
+                  <div className="stats-row">
+                    <span>Leads:</span>
+                    <span style={{ color: '#34a853', fontWeight: 'bold' }}>{link.lead_count || 0}</span>
+                  </div>
                 </div>
-                <div className="stats-row">
-                  <span>Saídas totais:</span>
-                  <span style={{ color: '#EA4335', fontWeight: 'bold' }}>{link.saidas_totais || 0}</span>
+                
+                <div className="card-content">
+                  <p><strong>Nome:</strong> {link.nome_link}</p>
+                  <p><strong>Link:</strong> {link.link}</p>
+                  <p><strong>ID do Canal:</strong> {link.id_channel_telegram || 'Não definido'}</p>
+                  <p><strong>Pixel ID:</strong> {link.pixel_id}</p>
+                  <p><strong>Data de Criação:</strong> {link.created_at ? new Date(link.created_at).toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }) : 'Não disponível'}</p>
                 </div>
-                <div className="stats-row">
-                  <span>Saídas de usuários que usaram o link:</span>
-                  <span style={{ color: '#FBBC05', fontWeight: 'bold' }}>{link.saidas_que_usaram_link || 0}</span>
-                </div>
-              </div>
-              
-              <div className="card-content">
-                <p><strong>Nome:</strong> {link.nome_link}</p>
-                <p><strong>Link:</strong> {link.link}</p>
-                <p><strong>ID do Canal:</strong> {link.id_channel_telegram || 'Não definido'}</p>
-                <p><strong>Pixel ID:</strong> {link.pixel_id}</p>
-              </div>
 
-              <div className="card-actions">
-                <button 
-                  className="button" 
-                  onClick={() => handleEdit(link)}
-                >
-                  Editar
-                </button>
-                <button 
-                  className="button button-danger" 
-                  onClick={() => handleDeleteClick(link)}
-                >
-                  Excluir
-                </button>
-                <a
-                  href={link.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="card-link"
-                >
-                  Abrir Link →
-                </a>
+                <div className="card-actions">
+                  <button 
+                    className="button" 
+                    onClick={() => handleEdit(link)}
+                  >
+                    Editar
+                  </button>
+                  <button 
+                    className="button button-danger" 
+                    onClick={() => handleDeleteClick(link)}
+                  >
+                    Excluir
+                  </button>
+                  <button 
+                    className="button" 
+                    onClick={() => handleStatsClick(link)}
+                  >
+                    Estatísticas
+                  </button>
+                  <a
+                    href={link.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="card-link"
+                  >
+                    Abrir Link →
+                  </a>
+                </div>
               </div>
+            ))}
+          </div>
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button 
+                onClick={() => paginate(currentPage - 1)} 
+                disabled={currentPage === 1}
+                className="pagination-button"
+              >
+                &laquo; Anterior
+              </button>
+              
+              <span className="pagination-info">
+                Página {currentPage} de {totalPages}
+              </span>
+              
+              <button 
+                onClick={() => paginate(currentPage + 1)} 
+                disabled={currentPage === totalPages}
+                className="pagination-button"
+              >
+                Próxima &raquo;
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
-
+      
       {/* Modal de Edição */}
       <Modal 
         isOpen={editingLink !== null} 
@@ -388,6 +584,83 @@ const Dashboard = () => {
             onSubmit={handleUpdate} 
             buttonText="Atualizar"
           />
+        )}
+      </Modal>
+
+      {/* Modal de Estatísticas */}
+      <Modal
+        isOpen={statsModalOpen}
+        onClose={() => setStatsModalOpen(false)}
+        title={`Estatísticas: ${selectedLinkStats?.nome_link || ''}`}
+      >
+        {selectedLinkStats && (
+          <div className="stats-modal-content">
+            <div className="stats-section">
+              <h3>Entradas pelo Link vs. Entradas Totais</h3>
+              <div className="stats-info">
+                <p>{calculateStats(selectedLinkStats).entryPercentage}% das entradas totais vieram através deste link</p>
+              </div>
+              <div className="stats-bar-container">
+                <div 
+                  className="stats-bar" 
+                  style={{ width: `${calculateStats(selectedLinkStats).entryPercentage}%`, backgroundColor: calculateStats(selectedLinkStats).entryColor }}
+                >
+                  {calculateStats(selectedLinkStats).entryPercentage}%
+                </div>
+              </div>
+              <div className="stats-legend">
+                <div className="stats-legend-item">
+                  <span className="stats-dot entry-dot"></span>
+                  <span>Entradas pelo link: {selectedLinkStats.quantidade_entrada}</span>
+                </div>
+                <div className="stats-legend-item">
+                  <span className="stats-dot total-dot"></span>
+                  <span>Entradas totais: {selectedLinkStats.entrada_total_grupo}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="stats-section">
+              <h3>Relação de Saídas</h3>
+              <div className="stats-info">
+                <p>{calculateStats(selectedLinkStats).exitRatio}% das saídas são de usuários que entraram por este link</p>
+              </div>
+              <div className="stats-bar-container">
+                <div 
+                  className="stats-bar exit-bar" 
+                  style={{ width: `${calculateStats(selectedLinkStats).exitRatio}%`, backgroundColor: calculateStats(selectedLinkStats).exitColor }}
+                >
+                  {calculateStats(selectedLinkStats).exitRatio}%
+                </div>
+              </div>
+              <div className="stats-legend">
+                <div className="stats-legend-item">
+                  <span className="stats-dot exit-link-dot"></span>
+                  <span>Saídas de usuários que usaram o link: {selectedLinkStats.saidas_que_usaram_link}</span>
+                </div>
+                <div className="stats-legend-item">
+                  <span className="stats-dot exit-total-dot"></span>
+                  <span>Saídas totais: {selectedLinkStats.saidas_totais}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="stats-section">
+              <h3>Média de Entradas por Dia</h3>
+              <div className="stats-info">
+                <p>Em média, {calculateStats(selectedLinkStats).entriesPerDay} pessoas entram por dia através deste link</p>
+              </div>
+              <div className="stats-value">
+                <span className="stats-number" style={{ color: calculateStats(selectedLinkStats).dailyColor }}>
+                  {calculateStats(selectedLinkStats).entriesPerDay}
+                </span>
+                <span className="stats-unit">entradas/dia</span>
+              </div>
+              <div className="stats-date-info">
+                <p>Link criado em: {selectedLinkStats.created_at ? new Date(selectedLinkStats.created_at).toLocaleDateString('pt-BR') : 'Data desconhecida'}</p>
+              </div>
+            </div>
+          </div>
         )}
       </Modal>
 
