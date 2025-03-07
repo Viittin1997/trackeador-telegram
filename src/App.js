@@ -394,6 +394,25 @@ const Dashboard = () => {
     setStatsModalOpen(true);
   };
 
+  // Função para determinar cor com base no desempenho
+  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
+    const numValue = parseFloat(value);
+    
+    if (higherIsBetter) {
+      // Quanto maior o valor, melhor o desempenho
+      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
+      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
+      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    } else {
+      // Quanto menor o valor, melhor o desempenho
+      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
+      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
+      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    }
+  }, []);
+
   // Calcular estatísticas para o link selecionado
   const calculateStats = useCallback((link) => {
     // Porcentagem de entradas pelo link em relação às entradas totais
@@ -436,26 +455,7 @@ const Dashboard = () => {
       exitColor,
       dailyColor
     };
-  }, []);
-
-  // Função para determinar cor com base no desempenho
-  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
-    const numValue = parseFloat(value);
-    
-    if (higherIsBetter) {
-      // Quanto maior o valor, melhor o desempenho
-      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
-      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
-      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    } else {
-      // Quanto menor o valor, melhor o desempenho
-      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
-      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
-      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    }
-  }, []);
+  }, [getColorByPerformance]);
 
   return (
     <div className="dashboard-container">
@@ -723,6 +723,25 @@ const EstatisticasGerais = () => {
     groupStats: []
   });
 
+  // Função para determinar cor com base no desempenho
+  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
+    const numValue = parseFloat(value);
+    
+    if (higherIsBetter) {
+      // Quanto maior o valor, melhor o desempenho
+      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
+      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
+      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    } else {
+      // Quanto menor o valor, melhor o desempenho
+      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
+      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
+      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    }
+  }, []);
+
   const calculateStats = useCallback((linksData) => {
     // Estatísticas totais
     const totalLinks = linksData.length;
@@ -798,7 +817,7 @@ const EstatisticasGerais = () => {
       expertStats,
       groupStats
     });
-  }, []);
+  }, [getColorByPerformance]);
 
   const fetchLinks = useCallback(async () => {
     try {
@@ -848,25 +867,6 @@ const EstatisticasGerais = () => {
       ? ((stats.totalSaidasUsaramLink / stats.totalSaidas) * 100).toFixed(2)
       : 0;
   };
-
-  // Função para determinar cor com base no desempenho
-  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
-    const numValue = parseFloat(value);
-    
-    if (higherIsBetter) {
-      // Quanto maior o valor, melhor o desempenho
-      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
-      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
-      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    } else {
-      // Quanto menor o valor, melhor o desempenho
-      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
-      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
-      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    }
-  }, []);
 
   return (
     <div className="dashboard-container">
