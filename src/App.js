@@ -455,7 +455,7 @@ const Dashboard = () => {
       exitColor,
       dailyColor
     };
-  }, [getColorByPerformance]);
+  }, []);
 
   return (
     <div className="dashboard-container">
@@ -817,7 +817,7 @@ const EstatisticasGerais = () => {
       expertStats,
       groupStats
     });
-  }, [getColorByPerformance]);
+  }, []);
 
   const fetchLinks = useCallback(async () => {
     try {
@@ -856,17 +856,17 @@ const EstatisticasGerais = () => {
   }, [fetchLinks]);
 
   // Calcular porcentagens e taxas
-  const calcularTaxaConversao = () => {
+  const calcularTaxaConversao = useCallback(() => {
     return stats.totalEntradasGrupo > 0 
       ? ((stats.totalEntradas / stats.totalEntradasGrupo) * 100).toFixed(2)
       : 0;
-  };
+  }, [stats.totalEntradas, stats.totalEntradasGrupo]);
 
-  const calcularTaxaSaida = () => {
+  const calcularTaxaSaida = useCallback(() => {
     return stats.totalSaidas > 0 
       ? ((stats.totalSaidasUsaramLink / stats.totalSaidas) * 100).toFixed(2)
       : 0;
-  };
+  }, [stats.totalSaidas, stats.totalSaidasUsaramLink]);
 
   return (
     <div className="dashboard-container">
