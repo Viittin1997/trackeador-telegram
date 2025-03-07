@@ -119,18 +119,13 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
 
   return (
     <form onSubmit={handleSubmit}>
-      {/* Campo ID do Canal Telegram com instruções */}
+      {/* Campo ID do Canal Telegram */}
       {renderFieldWithInstructions(
         'id_channel_telegram',
         'ID do Canal Telegram',
         <div>
-          <p>Para obter o ID do canal:</p>
-          <ol>
-            <li>Abra o Telegram Web no computador</li>
-            <li>Acesse o grupo/canal desejado</li>
-            <li>O ID estará na URL do navegador</li>
-            <li>Exemplo: <code>-1002156853392</code> (inclua o sinal de menos)</li>
-          </ol>
+          <p>Este ID será fornecido manualmente.</p>
+          <p>Formato exemplo: <code>-1002156853392</code> (inclua o sinal de menos se presente)</p>
         </div>
       )}
       
@@ -224,7 +219,9 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
           key !== 'saidas_que_usaram_link' &&
           key !== 'nome_link' &&
           key !== 'group_name' &&
-          key !== 'expert_apelido'
+          key !== 'expert_apelido' &&
+          key !== 'lead_count' &&
+          key !== 'created_at'
         )
         .map((field) => (
           <div className="form-group" key={field}>
