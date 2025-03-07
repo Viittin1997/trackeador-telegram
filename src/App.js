@@ -709,6 +709,338 @@ const Dashboard = () => {
   );
 };
 
+// Componente de Estatísticas Gerais
+const EstatisticasGerais = () => {
+  const [links, setLinks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalLinks: 0,
+    totalEntradas: 0,
+    totalEntradasGrupo: 0,
+    totalSaidas: 0,
+    totalSaidasUsaramLink: 0,
+    totalLeads: 0,
+    expertStats: [],
+    groupStats: []
+  });
+
+  useEffect(() => {
+    fetchLinks();
+  }, []);
+
+  const fetchLinks = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('bravobet_links_personalizados')
+        .select('*');
+
+      if (error) throw error;
+      
+      // Buscar contagem de leads para cada link
+      const linksWithLeadCount = await Promise.all(data.map(async (link) => {
+        const { count, error: countError } = await supabase
+          .from('bravobet_leads_telegram')
+          .select('id', { count: 'exact', head: true })
+          .eq('nome_invite_link_usado', link.nome_link);
+          
+        if (countError) {
+          console.error('Erro ao buscar contagem de leads:', countError.message);
+          return { ...link, lead_count: 0 };
+        }
+        
+        return { ...link, lead_count: count || 0 };
+      }));
+      
+      setLinks(linksWithLeadCount || []);
+      calculateStats(linksWithLeadCount || []);
+    } catch (error) {
+      console.error('Erro ao buscar links:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateStats = (linksData) => {
+    // Estatísticas totais
+    const totalLinks = linksData.length;
+    const totalEntradas = linksData.reduce((sum, link) => sum + (link.quantidade_entrada || 0), 0);
+    const totalEntradasGrupo = linksData.reduce((sum, link) => sum + (link.entrada_total_grupo || 0), 0);
+    const totalSaidas = linksData.reduce((sum, link) => sum + (link.saidas_totais || 0), 0);
+    const totalSaidasUsaramLink = linksData.reduce((sum, link) => sum + (link.saidas_que_usaram_link || 0), 0);
+    const totalLeads = linksData.reduce((sum, link) => sum + (link.lead_count || 0), 0);
+
+    // Estatísticas por expert
+    const expertMap = new Map();
+    linksData.forEach(link => {
+      if (!link.expert_apelido) return;
+      
+      if (!expertMap.has(link.expert_apelido)) {
+        expertMap.set(link.expert_apelido, {
+          expert: link.expert_apelido,
+          links: 0,
+          entradas: 0,
+          entradasGrupo: 0,
+          saidas: 0,
+          saidasUsaramLink: 0,
+          leads: 0
+        });
+      }
+      
+      const expertStats = expertMap.get(link.expert_apelido);
+      expertStats.links += 1;
+      expertStats.entradas += (link.quantidade_entrada || 0);
+      expertStats.entradasGrupo += (link.entrada_total_grupo || 0);
+      expertStats.saidas += (link.saidas_totais || 0);
+      expertStats.saidasUsaramLink += (link.saidas_que_usaram_link || 0);
+      expertStats.leads += (link.lead_count || 0);
+    });
+    
+    // Estatísticas por grupo
+    const groupMap = new Map();
+    linksData.forEach(link => {
+      if (!link.group_name) return;
+      
+      if (!groupMap.has(link.group_name)) {
+        groupMap.set(link.group_name, {
+          grupo: link.group_name,
+          links: 0,
+          entradas: 0,
+          entradasGrupo: 0,
+          saidas: 0,
+          saidasUsaramLink: 0,
+          leads: 0
+        });
+      }
+      
+      const groupStats = groupMap.get(link.group_name);
+      groupStats.links += 1;
+      groupStats.entradas += (link.quantidade_entrada || 0);
+      groupStats.entradasGrupo += (link.entrada_total_grupo || 0);
+      groupStats.saidas += (link.saidas_totais || 0);
+      groupStats.saidasUsaramLink += (link.saidas_que_usaram_link || 0);
+      groupStats.leads += (link.lead_count || 0);
+    });
+
+    // Ordenar por número de entradas (decrescente)
+    const expertStats = Array.from(expertMap.values()).sort((a, b) => b.entradas - a.entradas);
+    const groupStats = Array.from(groupMap.values()).sort((a, b) => b.entradas - a.entradas);
+
+    setStats({
+      totalLinks,
+      totalEntradas,
+      totalEntradasGrupo,
+      totalSaidas,
+      totalSaidasUsaramLink,
+      totalLeads,
+      expertStats,
+      groupStats
+    });
+  };
+
+  // Calcular porcentagens e taxas
+  const calcularTaxaConversao = () => {
+    return stats.totalEntradasGrupo > 0 
+      ? ((stats.totalEntradas / stats.totalEntradasGrupo) * 100).toFixed(2)
+      : 0;
+  };
+
+  const calcularTaxaSaida = () => {
+    return stats.totalSaidas > 0 
+      ? ((stats.totalSaidasUsaramLink / stats.totalSaidas) * 100).toFixed(2)
+      : 0;
+  };
+
+  // Função para determinar cor com base no desempenho
+  const getColorByPerformance = (value, higherIsBetter, reference = 50) => {
+    const numValue = parseFloat(value);
+    
+    if (higherIsBetter) {
+      // Quanto maior o valor, melhor o desempenho
+      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
+      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
+      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    } else {
+      // Quanto menor o valor, melhor o desempenho
+      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
+      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
+      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
+      return '#EA4335'; // Vermelho - Precisa melhorar
+    }
+  };
+
+  return (
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h2>Estatísticas Gerais</h2>
+        <button onClick={fetchLinks} className="button button-update">
+          Atualizar Dados
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '20px' }}>Carregando...</div>
+      ) : (
+        <div className="estatisticas-gerais">
+          {/* Resumo geral */}
+          <div className="stats-overview">
+            <div className="stats-card">
+              <h3>Total de Links</h3>
+              <div className="stats-value">{stats.totalLinks}</div>
+            </div>
+            <div className="stats-card">
+              <h3>Total de Entradas</h3>
+              <div className="stats-value" style={{ color: '#34a853' }}>{stats.totalEntradas}</div>
+            </div>
+            <div className="stats-card">
+              <h3>Total de Entradas nos Grupos</h3>
+              <div className="stats-value" style={{ color: '#4285F4' }}>{stats.totalEntradasGrupo}</div>
+            </div>
+            <div className="stats-card">
+              <h3>Total de Saídas</h3>
+              <div className="stats-value" style={{ color: '#EA4335' }}>{stats.totalSaidas}</div>
+            </div>
+            <div className="stats-card">
+              <h3>Saídas de Usuários que Usaram Links</h3>
+              <div className="stats-value" style={{ color: '#FBBC05' }}>{stats.totalSaidasUsaramLink}</div>
+            </div>
+            <div className="stats-card">
+              <h3>Total de Leads</h3>
+              <div className="stats-value" style={{ color: '#34a853' }}>{stats.totalLeads}</div>
+            </div>
+          </div>
+
+          {/* Gráficos de conversão */}
+          <div className="stats-graphs">
+            <div className="stats-section">
+              <h3>Taxa de Conversão de Entradas</h3>
+              <div className="stats-info">
+                <p>{calcularTaxaConversao()}% das entradas totais vieram através dos links</p>
+              </div>
+              <div className="stats-bar-container">
+                <div 
+                  className="stats-bar" 
+                  style={{ 
+                    width: `${calcularTaxaConversao()}%`, 
+                    backgroundColor: getColorByPerformance(calcularTaxaConversao(), true) 
+                  }}
+                >
+                  {calcularTaxaConversao()}%
+                </div>
+              </div>
+            </div>
+
+            <div className="stats-section">
+              <h3>Taxa de Saídas</h3>
+              <div className="stats-info">
+                <p>{calcularTaxaSaida()}% das saídas são de usuários que entraram pelos links</p>
+              </div>
+              <div className="stats-bar-container">
+                <div 
+                  className="stats-bar exit-bar" 
+                  style={{ 
+                    width: `${calcularTaxaSaida()}%`, 
+                    backgroundColor: getColorByPerformance(calcularTaxaSaida(), false) 
+                  }}
+                >
+                  {calcularTaxaSaida()}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Estatísticas por expert */}
+          <div className="stats-table-section">
+            <h3>Estatísticas por Expert</h3>
+            <div className="table-container">
+              <table className="stats-table">
+                <thead>
+                  <tr>
+                    <th>Expert</th>
+                    <th>Links</th>
+                    <th>Entradas</th>
+                    <th>Entradas no Grupo</th>
+                    <th>Taxa de Conversão</th>
+                    <th>Saídas</th>
+                    <th>Saídas (Usaram Link)</th>
+                    <th>Leads</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.expertStats.map((expert, index) => {
+                    const taxaConversao = expert.entradasGrupo > 0 
+                      ? ((expert.entradas / expert.entradasGrupo) * 100).toFixed(2)
+                      : 0;
+                    
+                    return (
+                      <tr key={index}>
+                        <td>{expert.expert}</td>
+                        <td>{expert.links}</td>
+                        <td>{expert.entradas}</td>
+                        <td>{expert.entradasGrupo}</td>
+                        <td style={{ color: getColorByPerformance(taxaConversao, true) }}>
+                          {taxaConversao}%
+                        </td>
+                        <td>{expert.saidas}</td>
+                        <td>{expert.saidasUsaramLink}</td>
+                        <td>{expert.leads}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Estatísticas por grupo */}
+          <div className="stats-table-section">
+            <h3>Estatísticas por Grupo</h3>
+            <div className="table-container">
+              <table className="stats-table">
+                <thead>
+                  <tr>
+                    <th>Grupo</th>
+                    <th>Links</th>
+                    <th>Entradas</th>
+                    <th>Entradas no Grupo</th>
+                    <th>Taxa de Conversão</th>
+                    <th>Saídas</th>
+                    <th>Saídas (Usaram Link)</th>
+                    <th>Leads</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.groupStats.map((grupo, index) => {
+                    const taxaConversao = grupo.entradasGrupo > 0 
+                      ? ((grupo.entradas / grupo.entradasGrupo) * 100).toFixed(2)
+                      : 0;
+                    
+                    return (
+                      <tr key={index}>
+                        <td>{grupo.grupo}</td>
+                        <td>{grupo.links}</td>
+                        <td>{grupo.entradas}</td>
+                        <td>{grupo.entradasGrupo}</td>
+                        <td style={{ color: getColorByPerformance(taxaConversao, true) }}>
+                          {taxaConversao}%
+                        </td>
+                        <td>{grupo.saidas}</td>
+                        <td>{grupo.saidasUsaramLink}</td>
+                        <td>{grupo.leads}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Componente Principal
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -744,6 +1076,12 @@ const App = () => {
             Dashboard
           </button>
           <button
+            className={`nav-button ${activeTab === 'estatisticas' ? 'active' : ''}`}
+            onClick={() => setActiveTab('estatisticas')}
+          >
+            Estatísticas Gerais
+          </button>
+          <button
             className={`nav-button ${activeTab === 'cadastro' ? 'active' : ''}`}
             onClick={() => setActiveTab('cadastro')}
           >
@@ -762,6 +1100,8 @@ const App = () => {
       <main style={{ padding: '20px 0' }}>
         {activeTab === 'dashboard' ? (
           <Dashboard />
+        ) : activeTab === 'estatisticas' ? (
+          <EstatisticasGerais />
         ) : (
           <CadastroForm onCadastroSuccess={() => setActiveTab('dashboard')} />
         )}
