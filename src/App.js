@@ -455,7 +455,7 @@ const Dashboard = () => {
       exitColor,
       dailyColor
     };
-  }, []);
+  }, [getColorByPerformance]);
 
   return (
     <div className="dashboard-container">
