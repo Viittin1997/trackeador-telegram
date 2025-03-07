@@ -196,6 +196,21 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
         </div>
       )}
       
+      {/* Campo Apelido do Expert com instruções */}
+      {renderFieldWithInstructions(
+        'expert_apelido',
+        'Apelido do Expert',
+        <div>
+          <p><strong>Importante: Mantenha a consistência do apelido!</strong></p>
+          <ul>
+            <li>Se já usou um apelido anteriormente (ex: "llaviator"), utilize sempre o mesmo</li>
+            <li>Isso facilita a filtragem e organização dos links no dashboard</li>
+            <li>Não use variações do mesmo apelido (ex: "llaviator", "llaviator1", "llaviator_oficial")</li>
+            <li>Verifique os apelidos existentes antes de criar um novo</li>
+          </ul>
+        </div>
+      )}
+      
       {/* Outros campos do formulário */}
       {Object.keys(formData)
         .filter(key => 
@@ -208,7 +223,8 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
           key !== 'saidas_totais' && 
           key !== 'saidas_que_usaram_link' &&
           key !== 'nome_link' &&
-          key !== 'group_name'
+          key !== 'group_name' &&
+          key !== 'expert_apelido'
         )
         .map((field) => (
           <div className="form-group" key={field}>
