@@ -86,12 +86,18 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
     token_api: '',
     pixel_id: '',
     id_channel_telegram: '',
+    bio_ou_externo: false,
     ...initialData
   });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleToggleChange = (e) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
   const handleSubmit = (e) => {
@@ -206,6 +212,29 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
         </div>
       )}
       
+      {/* Campo Toggle para Bio ou Link Externo */}
+      <div className="form-group">
+        <label className="form-label">Link Externo (Bio Instagram ou similar)</label>
+        <div className="toggle-container">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              name="bio_ou_externo"
+              checked={formData.bio_ou_externo || false}
+              onChange={handleToggleChange}
+            />
+            <span className="toggle-slider"></span>
+          </label>
+          <span className="toggle-label">
+            {formData.bio_ou_externo ? 'Ativado' : 'Desativado'}
+          </span>
+        </div>
+        <div className="form-instructions">
+          <p><strong>Importante:</strong> Ative esta opção apenas se o link for usado em uma bio do Instagram ou outro local externo.</p>
+          <p>Quando ativado, o pixel não será marcado na automação do n8n para rastreamento do anúncio.</p>
+        </div>
+      </div>
+
       {/* Outros campos do formulário */}
       {Object.keys(formData)
         .filter(key => 
@@ -221,7 +250,8 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
           key !== 'group_name' &&
           key !== 'expert_apelido' &&
           key !== 'lead_count' &&
-          key !== 'created_at'
+          key !== 'created_at' &&
+          key !== 'bio_ou_externo'
         )
         .map((field) => (
           <div className="form-group" key={field}>
