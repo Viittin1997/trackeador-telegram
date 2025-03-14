@@ -649,9 +649,14 @@ const Dashboard = () => {
               <div className="stats-bar-container">
                 <div 
                   className="stats-bar" 
-                  style={{ width: `${calculateStats(selectedLinkStats).entryPercentage}%`, backgroundColor: calculateStats(selectedLinkStats).entryColor }}
+                  style={{ 
+                    width: `${calculateStats(selectedLinkStats).entryPercentage}%`, 
+                    backgroundColor: calculateStats(selectedLinkStats).entryColor 
+                  }}
                 >
-                  {calculateStats(selectedLinkStats).entryPercentage}%
+                  {calculateStats(selectedLinkStats).entryPercentage > 10
+                    ? `${calculateStats(selectedLinkStats).entryPercentage}%` 
+                    : ''}
                 </div>
               </div>
               <div className="stats-legend">
@@ -674,9 +679,14 @@ const Dashboard = () => {
               <div className="stats-bar-container">
                 <div 
                   className="stats-bar exit-bar" 
-                  style={{ width: `${calculateStats(selectedLinkStats).exitRatio}%`, backgroundColor: calculateStats(selectedLinkStats).exitColor }}
+                  style={{ 
+                    width: `${calculateStats(selectedLinkStats).exitRatio}%`, 
+                    backgroundColor: calculateStats(selectedLinkStats).exitColor 
+                  }}
                 >
-                  {calculateStats(selectedLinkStats).exitRatio}%
+                  {calculateStats(selectedLinkStats).exitRatio > 10
+                    ? `${calculateStats(selectedLinkStats).exitRatio}%` 
+                    : ''}
                 </div>
               </div>
               <div className="stats-legend">
@@ -954,7 +964,9 @@ const EstatisticasGerais = () => {
                     backgroundColor: getColorByPerformance(calcularTaxaConversao(), true) 
                   }}
                 >
-                  {calcularTaxaConversao()}%
+                  {calcularTaxaConversao() > 10
+                    ? `${calcularTaxaConversao()}%` 
+                    : ''}
                 </div>
               </div>
             </div>
@@ -972,7 +984,9 @@ const EstatisticasGerais = () => {
                     backgroundColor: getColorByPerformance(calcularTaxaSaida(), false) 
                   }}
                 >
-                  {calcularTaxaSaida()}%
+                  {calcularTaxaSaida() > 10
+                    ? `${calcularTaxaSaida()}%` 
+                    : ''}
                 </div>
               </div>
             </div>
@@ -1008,7 +1022,9 @@ const EstatisticasGerais = () => {
                         <td>{expert.entradas}</td>
                         <td>{expert.entradasGrupo}</td>
                         <td style={{ color: getColorByPerformance(taxaConversao, true) }}>
-                          {taxaConversao}%
+                          {taxaConversao > 10
+                            ? `${taxaConversao}%` 
+                            : '0%'}
                         </td>
                         <td>{expert.saidas}</td>
                         <td>{expert.saidasUsaramLink}</td>
@@ -1051,7 +1067,9 @@ const EstatisticasGerais = () => {
                         <td>{grupo.entradas}</td>
                         <td>{grupo.entradasGrupo}</td>
                         <td style={{ color: getColorByPerformance(taxaConversao, true) }}>
-                          {taxaConversao}%
+                          {taxaConversao > 10
+                            ? `${taxaConversao}%` 
+                            : '0%'}
                         </td>
                         <td>{grupo.saidas}</td>
                         <td>{grupo.saidasUsaramLink}</td>
@@ -1063,6 +1081,354 @@ const EstatisticasGerais = () => {
               </table>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Componente de Relatórios Diários
+const RelatoriosDiarios = () => {
+  const [loading, setLoading] = useState(false);
+  const [links, setLinks] = useState([]);
+  const [selectedLink, setSelectedLink] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [relatorio, setRelatorio] = useState(null);
+  const [error, setError] = useState('');
+  const [buscaRealizada, setBuscaRealizada] = useState(false);
+
+  // Função para determinar a cor com base no desempenho
+  const getColorByPerformance = (value) => {
+    if (value >= 80) return '#34a853'; // Verde - Excelente
+    if (value >= 50) return '#4285F4'; // Azul - Bom
+    if (value >= 30) return '#FBBC05'; // Amarelo - Regular
+    return '#EA4335'; // Vermelho - Ruim
+  };
+
+  // Buscar lista de links para o dropdown
+  useEffect(() => {
+    const fetchLinks = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('bravobet_links_personalizados')
+          .select('id, nome_link, expert_apelido');
+
+        if (error) throw error;
+        setLinks(data || []);
+      } catch (error) {
+        console.error('Erro ao buscar links:', error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLinks();
+  }, []);
+
+  // Função para buscar relatório diário
+  const buscarRelatorio = async () => {
+    if (!selectedLink || !selectedDate) {
+      setError('Por favor, selecione um link e uma data.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setBuscaRealizada(true);
+      
+      console.log('Buscando relatório para:', {
+        link: selectedLink,
+        data: selectedDate
+      });
+      
+      // Buscar todos os relatórios e filtrar no lado do cliente
+      const { data, error } = await supabase
+        .from('bravobet_metricas_diarias')
+        .select('*');
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Todos os relatórios:', data);
+      
+      // Filtrar no lado do cliente para garantir que encontramos o relatório
+      let relatorioEncontrado = null;
+      
+      if (data && data.length > 0) {
+        // Primeiro tentamos uma correspondência exata
+        relatorioEncontrado = data.find(item => 
+          item.nome_link === selectedLink && 
+          item.data_formatada === selectedDate
+        );
+        
+        // Se não encontrar, tentamos uma correspondência parcial case-insensitive
+        if (!relatorioEncontrado) {
+          relatorioEncontrado = data.find(item => 
+            item.nome_link && selectedLink &&
+            item.nome_link.toLowerCase().includes(selectedLink.toLowerCase()) && 
+            item.data_formatada === selectedDate
+          );
+        }
+        
+        // Se ainda não encontrar, tentamos apenas pela data
+        if (!relatorioEncontrado) {
+          relatorioEncontrado = data.find(item => 
+            item.data_formatada === selectedDate
+          );
+        }
+      }
+      
+      console.log('Relatório encontrado:', relatorioEncontrado);
+      setRelatorio(relatorioEncontrado);
+    } catch (error) {
+      console.error('Erro ao buscar relatório:', error.message);
+      setError(`Erro ao buscar relatório: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Formatar data para exibição
+  const formatarData = (dataString) => {
+    if (!dataString) return '';
+    const [ano, mes, dia] = dataString.split('-');
+    return `${dia}/${mes}/${ano}`;
+  };
+
+  return (
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h2>Relatórios Diários</h2>
+      </div>
+
+      <div className="filtros-container">
+        <div className="filtro-grupo">
+          <label className="filtro-label">Link:</label>
+          <select 
+            className="filtro-select"
+            value={selectedLink}
+            onChange={(e) => setSelectedLink(e.target.value)}
+          >
+            <option value="">Selecione um link</option>
+            {links.map((link) => (
+              <option key={link.id} value={link.nome_link}>
+                {link.nome_link} - {link.expert_apelido}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filtro-grupo">
+          <label className="filtro-label">Data:</label>
+          <input
+            type="date"
+            className="filtro-input"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+        </div>
+
+        <button 
+          className="button"
+          onClick={buscarRelatorio}
+          disabled={loading}
+        >
+          {loading ? 'Buscando...' : 'Buscar Relatório'}
+        </button>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      {buscaRealizada && !loading && (
+        <div className="relatorio-container">
+          {relatorio ? (
+            <div className="relatorio-card">
+              <h3>Relatório de {formatarData(relatorio.data_formatada)}</h3>
+              <h4>Link: {relatorio.nome_link}</h4>
+              
+              <div className="relatorio-stats">
+                <div className="relatorio-stat-grupo">
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Entradas pelo Link:</span>
+                    <span className="stat-value" style={{ color: '#34a853' }}>{relatorio.entradas_link}</span>
+                  </div>
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Entradas Totais:</span>
+                    <span className="stat-value" style={{ color: '#4285F4' }}>{relatorio.entradas_totais}</span>
+                  </div>
+                </div>
+
+                <div className="relatorio-stat-grupo">
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Saídas de Usuários do Link:</span>
+                    <span className="stat-value" style={{ color: '#FBBC05' }}>{relatorio.saidas_link}</span>
+                  </div>
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Saídas Totais:</span>
+                    <span className="stat-value" style={{ color: '#EA4335' }}>{relatorio.saidas_totais}</span>
+                  </div>
+                </div>
+                
+                <div className="relatorio-stat-grupo">
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Data de Registro:</span>
+                    <span className="stat-value">
+                      {new Date(relatorio.created_at).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Taxa de Conversão */}
+                <div className="relatorio-stat-grupo">
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Taxa de Conversão:</span>
+                    <span className="stat-value" style={{ 
+                      color: relatorio.entradas_totais > 0 
+                        ? '#4285F4' 
+                        : '#757575' 
+                    }}>
+                      {relatorio.entradas_totais > 0 
+                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Contribuição para o Grupo */}
+                <div className="relatorio-stat-grupo">
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Contribuição para o Grupo:</span>
+                    <span className="stat-value" style={{ 
+                      color: getColorByPerformance(
+                        relatorio.entradas_totais > 0 
+                          ? ((relatorio.entradas_link / relatorio.entradas_totais) * 100) 
+                          : 0
+                      ) 
+                    }}>
+                      {relatorio.entradas_link > 0 && relatorio.entradas_totais > 0
+                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%`
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Gráficos */}
+              <div className="relatorio-graficos">
+                <div className="grafico-section">
+                  <h4>Distribuição de Entradas</h4>
+                  <div className="stats-bar-label">Link: {relatorio.entradas_link}</div>
+                  <div className="stats-bar-container">
+                    <div 
+                      className="stats-bar" 
+                      style={{ 
+                        width: `${relatorio.entradas_totais > 0 
+                          ? (relatorio.entradas_link / relatorio.entradas_totais) * 100 
+                          : 0}%`,
+                        backgroundColor: '#34a853'
+                      }}
+                    >
+                      {relatorio.entradas_totais > 0 && ((relatorio.entradas_link / relatorio.entradas_totais) * 100) > 10
+                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
+                        : ''}
+                    </div>
+                  </div>
+                  
+                  <div className="stats-bar-label">Outras Entradas: {relatorio.entradas_totais - relatorio.entradas_link}</div>
+                  <div className="stats-bar-container">
+                    <div 
+                      className="stats-bar" 
+                      style={{ 
+                        width: `${relatorio.entradas_totais > 0 
+                          ? ((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100 
+                          : 0}%`,
+                        backgroundColor: '#4285F4'
+                      }}
+                    >
+                      {relatorio.entradas_totais > 0 && (((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100) > 10
+                        ? `${(((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100).toFixed(2)}%` 
+                        : ''}
+                    </div>
+                  </div>
+                  
+                  <div className="stats-percentages">
+                    <div className="stats-percentage-item">
+                      <span className="percentage-dot" style={{ backgroundColor: '#34a853' }}></span>
+                      <span>Link: {relatorio.entradas_totais > 0 
+                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
+                        : '0%'}</span>
+                    </div>
+                    <div className="stats-percentage-item">
+                      <span className="percentage-dot" style={{ backgroundColor: '#4285F4' }}></span>
+                      <span>Outras: {relatorio.entradas_totais > 0 
+                        ? `${(((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100).toFixed(2)}%` 
+                        : '0%'}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grafico-section">
+                  <h4>Comparação de Saídas</h4>
+                  <div className="stats-bar-label">Saídas do Link: {relatorio.saidas_link}</div>
+                  <div className="stats-bar-container">
+                    <div 
+                      className="stats-bar" 
+                      style={{ 
+                        width: `${relatorio.saidas_totais > 0 
+                          ? (relatorio.saidas_link / relatorio.saidas_totais) * 100 
+                          : 0}%`,
+                        backgroundColor: '#FBBC05'
+                      }}
+                    >
+                      {relatorio.saidas_totais > 0 && ((relatorio.saidas_link / relatorio.saidas_totais) * 100) > 10
+                        ? `${((relatorio.saidas_link / relatorio.saidas_totais) * 100).toFixed(2)}%` 
+                        : ''}
+                    </div>
+                  </div>
+                  
+                  <div className="stats-bar-label">Outras Saídas: {relatorio.saidas_totais - relatorio.saidas_link}</div>
+                  <div className="stats-bar-container">
+                    <div 
+                      className="stats-bar" 
+                      style={{ 
+                        width: `${relatorio.saidas_totais > 0 
+                          ? ((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100 
+                          : 0}%`,
+                        backgroundColor: '#EA4335'
+                      }}
+                    >
+                      {relatorio.saidas_totais > 0 && (((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100) > 10
+                        ? `${(((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100).toFixed(2)}%` 
+                        : ''}
+                    </div>
+                  </div>
+                  
+                  <div className="stats-percentages">
+                    <div className="stats-percentage-item">
+                      <span className="percentage-dot" style={{ backgroundColor: '#FBBC05' }}></span>
+                      <span>Link: {relatorio.saidas_totais > 0 
+                        ? `${((relatorio.saidas_link / relatorio.saidas_totais) * 100).toFixed(2)}%` 
+                        : '0%'}</span>
+                    </div>
+                    <div className="stats-percentage-item">
+                      <span className="percentage-dot" style={{ backgroundColor: '#EA4335' }}></span>
+                      <span>Outras: {relatorio.saidas_totais > 0 
+                        ? `${(((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100).toFixed(2)}%` 
+                        : '0%'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="no-data-message">
+              <p>Não há relatório disponível para o link <strong>{selectedLink}</strong> na data <strong>{formatarData(selectedDate)}</strong>.</p>
+              <p>Os relatórios são gerados automaticamente ao final de cada dia.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1110,6 +1476,12 @@ const App = () => {
             Estatísticas Gerais
           </button>
           <button
+            className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`}
+            onClick={() => setActiveTab('relatorios')}
+          >
+            Relatórios Diários
+          </button>
+          <button
             className={`nav-button ${activeTab === 'cadastro' ? 'active' : ''}`}
             onClick={() => setActiveTab('cadastro')}
           >
@@ -1130,6 +1502,8 @@ const App = () => {
           <Dashboard />
         ) : activeTab === 'estatisticas' ? (
           <EstatisticasGerais />
+        ) : activeTab === 'relatorios' ? (
+          <RelatoriosDiarios />
         ) : (
           <CadastroForm onCadastroSuccess={() => setActiveTab('dashboard')} />
         )}

@@ -831,3 +831,209 @@ input:checked + .toggle-slider:before {
 .stats-table tr:hover {
   background-color: var(--bg-primary);
 }
+
+/* Estilos para a página de Relatórios Diários */
+.filtros-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  background-color: var(--bg-card);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  align-items: flex-end;
+}
+
+.filtro-grupo {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+}
+
+.filtro-label {
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+}
+
+.filtro-select,
+.filtro-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+}
+
+.filtro-select:focus,
+.filtro-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.relatorio-container {
+  margin-top: 20px;
+}
+
+.relatorio-card {
+  background-color: var(--bg-card);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+.relatorio-card h3 {
+  margin-top: 0;
+  color: var(--primary-color);
+  font-size: 18px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.relatorio-card h4 {
+  color: var(--text-secondary);
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.relatorio-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.relatorio-stat-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.relatorio-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  border-left: 4px solid var(--primary-color);
+}
+
+.stat-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.no-data-message {
+  background-color: #f9fafb;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-color);
+}
+
+.no-data-message p {
+  margin: 10px 0;
+}
+
+.no-data-message strong {
+  color: var(--text-primary);
+}
+
+.error-message {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+/* Estilos para gráficos na página de Relatórios Diários */
+.relatorio-graficos {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.grafico-section {
+  background-color: var(--bg-card);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.grafico-section h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: var(--text-primary);
+  font-size: 16px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.stats-bar-container {
+  margin-bottom: 15px;
+  position: relative;
+  background-color: #f1f1f1;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 24px;
+}
+
+.stats-bar-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.stats-bar {
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 10px;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 30px;
+  transition: width 0.5s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.stats-percentages {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.stats-percentage-item {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.percentage-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
