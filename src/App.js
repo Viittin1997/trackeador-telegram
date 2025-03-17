@@ -1096,8 +1096,9 @@ const RelatoriosDiarios = () => {
   const [relatorio, setRelatorio] = useState(null);
   const [error, setError] = useState('');
   const [buscaRealizada, setBuscaRealizada] = useState(false);
+  const [valorInvestido, setValorInvestido] = useState('');
+  const [cpa, setCpa] = useState(null);
 
-  // Função para determinar a cor com base no desempenho
   const getColorByPerformance = (value) => {
     if (value >= 80) return '#34a853'; // Verde - Excelente
     if (value >= 50) return '#4285F4'; // Azul - Bom
@@ -1105,28 +1106,75 @@ const RelatoriosDiarios = () => {
     return '#EA4335'; // Vermelho - Ruim
   };
 
-  // Buscar lista de links para o dropdown
+  const getColorByCPA = (cpa) => {
+    if (cpa <= 10) return '#34A853'; // Verde - Bom (CPA baixo é bom)
+    if (cpa <= 20) return '#FBBC05'; // Amarelo - Médio
+    return '#EA4335'; // Vermelho - Ruim (CPA alto é ruim)
+  };
+
+  // Formatar valor em reais
+  const formatarValorReais = (valor) => {
+    if (!valor) return 'R$ 0,00';
+    
+    // Se o valor já começar com R$, retorna ele mesmo
+    if (typeof valor === 'string' && valor.startsWith('R$')) {
+      return valor;
+    }
+    
+    // Tenta converter para número
+    const numero = typeof valor === 'string' ? 
+      parseFloat(valor.replace(/[^\d,]/g, '').replace(',', '.')) : 
+      parseFloat(valor);
+    
+    if (isNaN(numero)) return 'R$ 0,00';
+    
+    return `R$ ${numero.toFixed(2).replace('.', ',')}`;
+  };
+
+  const formatarEntradaValor = (e) => {
+    // Pega o valor digitado pelo usuário
+    let valor = e.target.value;
+    
+    // Remove o prefixo R$ se existir
+    if (valor.startsWith('R$ ')) {
+      valor = valor.substring(3);
+    }
+    
+    // Permite apenas números e vírgula
+    valor = valor.replace(/[^\d,]/g, '');
+    
+    // Atualiza o estado com o valor formatado
+    setValorInvestido(valor ? `R$ ${valor}` : '');
+  };
+
   useEffect(() => {
-    const fetchLinks = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('bravobet_links_personalizados')
-          .select('id, nome_link, expert_apelido');
-
-        if (error) throw error;
-        setLinks(data || []);
-      } catch (error) {
-        console.error('Erro ao buscar links:', error.message);
-      } finally {
-        setLoading(false);
+    if (relatorio && valorInvestido) {
+      console.log("Calculando CPA:");
+      console.log("Valor investido:", valorInvestido);
+      console.log("Entradas pelo link:", relatorio.entradas_link);
+      
+      // Limpar o valor investido (remover R$ e converter vírgula para ponto)
+      const valorLimpo = valorInvestido.replace(/[R$\s]/g, '').replace(',', '.');
+      const valorNumerico = parseFloat(valorLimpo);
+      
+      console.log("Valor limpo:", valorLimpo);
+      console.log("Valor numérico:", valorNumerico);
+      
+      if (!isNaN(valorNumerico) && relatorio.entradas_link > 0) {
+        // Fórmula do CPA: valor investido / entradas pelo link
+        const cpaCalculado = valorNumerico / relatorio.entradas_link;
+        console.log("CPA calculado:", cpaCalculado);
+        setCpa(cpaCalculado);
+      } else {
+        console.log("Não foi possível calcular o CPA. Valor numérico válido:", !isNaN(valorNumerico), "Entradas > 0:", relatorio.entradas_link > 0);
+        setCpa(null);
       }
-    };
+    } else {
+      console.log("Não há relatório ou valor investido para calcular CPA");
+      setCpa(null);
+    }
+  }, [valorInvestido, relatorio]);
 
-    fetchLinks();
-  }, []);
-
-  // Função para buscar relatório diário
   const buscarRelatorio = async () => {
     if (!selectedLink || !selectedDate) {
       setError('Por favor, selecione um link e uma data.');
@@ -1158,6 +1206,8 @@ const RelatoriosDiarios = () => {
       let relatorioEncontrado = null;
       
       if (data && data.length > 0) {
+        console.log("Estrutura completa do primeiro relatório:", JSON.stringify(data[0]));
+        
         // Primeiro tentamos uma correspondência exata
         relatorioEncontrado = data.find(item => 
           item.nome_link === selectedLink && 
@@ -1191,12 +1241,26 @@ const RelatoriosDiarios = () => {
     }
   };
 
-  // Formatar data para exibição
-  const formatarData = (dataString) => {
-    if (!dataString) return '';
-    const [ano, mes, dia] = dataString.split('-');
-    return `${dia}/${mes}/${ano}`;
-  };
+  // Buscar lista de links para o dropdown
+  useEffect(() => {
+    const fetchLinks = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('bravobet_links_personalizados')
+          .select('id, nome_link, expert_apelido');
+
+        if (error) throw error;
+        setLinks(data || []);
+      } catch (error) {
+        console.error('Erro ao buscar links:', error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLinks();
+  }, []);
 
   return (
     <div className="dashboard-container">
@@ -1231,6 +1295,17 @@ const RelatoriosDiarios = () => {
           />
         </div>
 
+        <div className="filtro-grupo">
+          <label className="filtro-label">Valor Investido:</label>
+          <input
+            type="text"
+            className="filtro-input"
+            value={valorInvestido}
+            onChange={formatarEntradaValor}
+            placeholder="R$ 0,00"
+          />
+        </div>
+
         <button 
           className="button"
           onClick={buscarRelatorio}
@@ -1246,8 +1321,8 @@ const RelatoriosDiarios = () => {
         <div className="relatorio-container">
           {relatorio ? (
             <div className="relatorio-card">
-              <h3>Relatório de {formatarData(relatorio.data_formatada)}</h3>
-              <h4>Link: {relatorio.nome_link}</h4>
+              <h3>Relatório de {selectedDate}</h3>
+              <h4>Link: {selectedLink}</h4>
               
               <div className="relatorio-stats">
                 <div className="relatorio-stat-grupo">
@@ -1311,6 +1386,24 @@ const RelatoriosDiarios = () => {
                       {relatorio.entradas_link > 0 && relatorio.entradas_totais > 0
                         ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%`
                         : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Valor Investido */}
+                <div className="relatorio-stat-grupo">
+                  <div className="relatorio-stat">
+                    <span className="stat-label">Valor Investido:</span>
+                    <span className="stat-value">{valorInvestido || 'R$ 0,00'}</span>
+                  </div>
+                </div>
+                
+                {/* CPA */}
+                <div className="relatorio-stat-grupo">
+                  <div className="relatorio-stat">
+                    <span className="stat-label">CPA:</span>
+                    <span className="stat-value" style={{ color: cpa !== null ? getColorByCPA(cpa) : '#757575' }}>
+                      {cpa !== null ? formatarValorReais(cpa) : 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -1421,11 +1514,38 @@ const RelatoriosDiarios = () => {
                     </div>
                   </div>
                 </div>
+                
+                {/* CPA Visualization */}
+                {cpa !== null && (
+                  <div className="grafico-section">
+                    <h4>Custo por Aquisição (CPA)</h4>
+                    <div className="cpa-container">
+                      <div className="cpa-bar-container">
+                        <div 
+                          className="cpa-bar" 
+                          style={{ 
+                            width: `${Math.min(100, (cpa / 30) * 100)}%`,
+                            backgroundColor: getColorByCPA(cpa)
+                          }}
+                        >
+                          {formatarValorReais(cpa)}
+                        </div>
+                      </div>
+                      
+                      <div className="cpa-scale">
+                        <span>R$ 0</span>
+                        <span>R$ 10</span>
+                        <span>R$ 20</span>
+                        <span>R$ 30+</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
             <div className="no-data-message">
-              <p>Não há relatório disponível para o link <strong>{selectedLink}</strong> na data <strong>{formatarData(selectedDate)}</strong>.</p>
+              <p>Não há relatório disponível para o link <strong>{selectedLink}</strong> na data <strong>{selectedDate}</strong>.</p>
               <p>Os relatórios são gerados automaticamente ao final de cada dia.</p>
             </div>
           )}

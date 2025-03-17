@@ -1037,3 +1037,53 @@ input:checked + .toggle-slider:before {
   border-radius: 50%;
   margin-right: 5px;
 }
+
+/* Estilos para o CPA */
+.cpa-container {
+  margin-top: 15px;
+  width: 100%;
+}
+
+.cpa-bar-container {
+  width: 100%;
+  height: 30px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.cpa-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  min-width: 60px;
+  text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.5);
+  height: 100%;
+}
+
+.cpa-scale {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 12px;
+  color: #666;
+  margin-top: 5px;
+}
+
+.cpa-scale span {
+  position: relative;
+}
+
+.cpa-scale span::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 5px;
+  width: 1px;
+  background-color: #ccc;
+}
