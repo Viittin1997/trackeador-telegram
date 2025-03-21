@@ -1098,12 +1098,19 @@ const RelatoriosDiarios = () => {
   const [buscaRealizada, setBuscaRealizada] = useState(false);
   const [valorInvestido, setValorInvestido] = useState('');
   const [cpa, setCpa] = useState(null);
+  const [entradasDetalhadas, setEntradasDetalhadas] = useState({
+    porCampanha: [],
+    porAnuncio: [],
+    porPlataforma: [],
+    porUrlLp: []
+  });
+  const [loadingEntradas, setLoadingEntradas] = useState(false);
 
   const getColorByPerformance = (value) => {
     if (value >= 80) return '#34a853'; // Verde - Excelente
     if (value >= 50) return '#4285F4'; // Azul - Bom
     if (value >= 30) return '#FBBC05'; // Amarelo - Regular
-    return '#EA4335'; // Vermelho - Ruim
+    return '#EA4335'; // Vermelho - Baixo
   };
 
   const getColorByCPA = (cpa) => {
@@ -1183,6 +1190,7 @@ const RelatoriosDiarios = () => {
 
     try {
       setLoading(true);
+      setLoadingEntradas(true);
       setError('');
       setBuscaRealizada(true);
       
@@ -1233,11 +1241,115 @@ const RelatoriosDiarios = () => {
       
       console.log('Relatório encontrado:', relatorioEncontrado);
       setRelatorio(relatorioEncontrado);
+      
+      // Buscar entradas detalhadas da nova tabela
+      await buscarEntradasDetalhadas(selectedDate, selectedLink);
+      
     } catch (error) {
       console.error('Erro ao buscar relatório:', error.message);
       setError(`Erro ao buscar relatório: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Função para buscar e agrupar entradas detalhadas
+  const buscarEntradasDetalhadas = async (data, link) => {
+    try {
+      setLoadingEntradas(true);
+      
+      // Buscar todas as entradas da data selecionada
+      const { data: entradasData, error: entradasError } = await supabase
+        .from('bravobet_registro_de_entrada')
+        .select('*')
+        .eq('data_formatada', data);
+      
+      if (entradasError) {
+        throw entradasError;
+      }
+      
+      console.log('Entradas encontradas:', entradasData);
+      
+      // Filtrar por link se necessário
+      let entradasFiltradas = entradasData;
+      if (link) {
+        entradasFiltradas = entradasData.filter(entrada => 
+          entrada.nome_link === link || entrada.nome_link.toLowerCase().includes(link.toLowerCase())
+        );
+      }
+      
+      // Inicializar objetos para armazenar os agrupamentos
+      const agrupamentosPorCampanha = {};
+      const agrupamentosPorAnuncio = {};
+      const agrupamentosPorPlataforma = {};
+      const agrupamentosPorUrlLp = {};
+      
+      // Processar cada entrada para criar os agrupamentos
+      entradasFiltradas.forEach(entrada => {
+        // Agrupamento por campanha
+        const chaveCampanha = `${entrada.campanha || 'sem_campanha'}-${entrada.conjunto || 'sem_conjunto'}-${entrada.anuncio || 'sem_anuncio'}`;
+        if (!agrupamentosPorCampanha[chaveCampanha]) {
+          agrupamentosPorCampanha[chaveCampanha] = {
+            campanha: entrada.campanha || 'Não informado',
+            conjunto: entrada.conjunto || 'Não informado',
+            anuncio: entrada.anuncio || 'Não informado',
+            quantidade: 0
+          };
+        }
+        agrupamentosPorCampanha[chaveCampanha].quantidade += 1;
+        
+        // Agrupamento por anúncio
+        const chaveAnuncio = entrada.anuncio || 'sem_anuncio';
+        if (!agrupamentosPorAnuncio[chaveAnuncio]) {
+          agrupamentosPorAnuncio[chaveAnuncio] = {
+            anuncio: entrada.anuncio || 'Não informado',
+            quantidade: 0
+          };
+        }
+        agrupamentosPorAnuncio[chaveAnuncio].quantidade += 1;
+        
+        // Agrupamento por plataforma
+        const chavePlataforma = entrada.plataforma || 'sem_plataforma';
+        if (!agrupamentosPorPlataforma[chavePlataforma]) {
+          agrupamentosPorPlataforma[chavePlataforma] = {
+            plataforma: entrada.plataforma || 'Não informado',
+            quantidade: 0
+          };
+        }
+        agrupamentosPorPlataforma[chavePlataforma].quantidade += 1;
+        
+        // Agrupamento por URL LP
+        const chaveUrlLp = entrada.url_lp || 'sem_url_lp';
+        if (!agrupamentosPorUrlLp[chaveUrlLp]) {
+          agrupamentosPorUrlLp[chaveUrlLp] = {
+            url_lp: entrada.url_lp || 'Não informado',
+            quantidade: 0
+          };
+        }
+        agrupamentosPorUrlLp[chaveUrlLp].quantidade += 1;
+      });
+      
+      // Converter para arrays e ordenar por quantidade (decrescente)
+      const porCampanha = Object.values(agrupamentosPorCampanha).sort((a, b) => b.quantidade - a.quantidade);
+      const porAnuncio = Object.values(agrupamentosPorAnuncio).sort((a, b) => b.quantidade - a.quantidade);
+      const porPlataforma = Object.values(agrupamentosPorPlataforma).sort((a, b) => b.quantidade - a.quantidade);
+      const porUrlLp = Object.values(agrupamentosPorUrlLp).sort((a, b) => b.quantidade - a.quantidade);
+      
+      console.log('Entradas agrupadas:', { porCampanha, porAnuncio, porPlataforma, porUrlLp });
+      
+      // Atualizar o estado com os dados agrupados
+      setEntradasDetalhadas({
+        porCampanha,
+        porAnuncio,
+        porPlataforma,
+        porUrlLp
+      });
+      
+    } catch (error) {
+      console.error('Erro ao buscar entradas detalhadas:', error.message);
+      setError(prev => prev ? `${prev}. Erro nas entradas: ${error.message}` : `Erro nas entradas: ${error.message}`);
+    } finally {
+      setLoadingEntradas(false);
     }
   };
 
@@ -1539,6 +1651,350 @@ const RelatoriosDiarios = () => {
                         <span>R$ 30+</span>
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Nova seção: Entradas Detalhadas */}
+              <div className="entradas-detalhadas-section">
+                <h3>Entradas Detalhadas por Campanha</h3>
+                {loadingEntradas ? (
+                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
+                ) : entradasDetalhadas.porCampanha.length > 0 ? (
+                  <div className="entradas-detalhadas-container">
+                    <table className="entradas-table">
+                      <thead>
+                        <tr>
+                          <th>Campanha</th>
+                          <th>Quantidade</th>
+                          <th>%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entradasDetalhadas.porCampanha.map((entrada, index) => {
+                          // Calcular porcentagem em relação ao total
+                          const totalEntradas = entradasDetalhadas.porCampanha.reduce((sum, item) => sum + item.quantidade, 0);
+                          const porcentagem = totalEntradas > 0 
+                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
+                            : '0.00';
+                            
+                          // Determinar cor com base na porcentagem
+                          const getCorPorcentagem = (valor) => {
+                            if (valor >= 50) return '#34a853'; // Verde - Excelente
+                            if (valor >= 30) return '#4285F4'; // Azul - Bom
+                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
+                            return '#EA4335'; // Vermelho - Baixo
+                          };
+                          
+                          return (
+                            <tr key={index}>
+                              <td>{entrada.campanha}</td>
+                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
+                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
+                                {porcentagem}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    
+                    {/* Gráfico de barras para entradas detalhadas */}
+                    <div className="entradas-grafico">
+                      <h4>Distribuição de Entradas por Campanha</h4>
+                      {entradasDetalhadas.porCampanha.slice(0, 5).map((entrada, index) => {
+                        const totalEntradas = entradasDetalhadas.porCampanha.reduce((sum, item) => sum + item.quantidade, 0);
+                        const porcentagem = totalEntradas > 0 
+                          ? ((entrada.quantidade / totalEntradas) * 100)
+                          : 0;
+                          
+                        const cores = ['#34a853', '#4285F4', '#FBBC05', '#EA4335', '#9C27B0'];
+                        
+                        return (
+                          <div key={index} className="grafico-item">
+                            <div className="grafico-label">
+                              {entrada.campanha}
+                            </div>
+                            <div className="stats-bar-container">
+                              <div 
+                                className="stats-bar" 
+                                style={{ 
+                                  width: `${porcentagem}%`,
+                                  backgroundColor: cores[index % cores.length]
+                                }}
+                              >
+                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                              </div>
+                            </div>
+                            <div className="grafico-value">
+                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    Nenhuma entrada detalhada encontrada para esta data e link.
+                  </div>
+                )}
+              </div>
+              
+              {/* Nova seção: Entradas por Anúncio */}
+              <div className="entradas-detalhadas-section">
+                <h3>Entradas Detalhadas por Anúncio</h3>
+                {loadingEntradas ? (
+                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
+                ) : entradasDetalhadas.porAnuncio.length > 0 ? (
+                  <div className="entradas-detalhadas-container">
+                    <table className="entradas-table">
+                      <thead>
+                        <tr>
+                          <th>Anúncio</th>
+                          <th>Quantidade</th>
+                          <th>%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entradasDetalhadas.porAnuncio.map((entrada, index) => {
+                          // Calcular porcentagem em relação ao total
+                          const totalEntradas = entradasDetalhadas.porAnuncio.reduce((sum, item) => sum + item.quantidade, 0);
+                          const porcentagem = totalEntradas > 0 
+                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
+                            : '0.00';
+                            
+                          // Determinar cor com base na porcentagem
+                          const getCorPorcentagem = (valor) => {
+                            if (valor >= 50) return '#34a853'; // Verde - Excelente
+                            if (valor >= 30) return '#4285F4'; // Azul - Bom
+                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
+                            return '#EA4335'; // Vermelho - Baixo
+                          };
+                          
+                          return (
+                            <tr key={index}>
+                              <td>{entrada.anuncio}</td>
+                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
+                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
+                                {porcentagem}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    
+                    {/* Gráfico de barras para entradas por anúncio */}
+                    <div className="entradas-grafico">
+                      <h4>Distribuição de Entradas por Anúncio</h4>
+                      {entradasDetalhadas.porAnuncio.slice(0, 5).map((entrada, index) => {
+                        const totalEntradas = entradasDetalhadas.porAnuncio.reduce((sum, item) => sum + item.quantidade, 0);
+                        const porcentagem = totalEntradas > 0 
+                          ? ((entrada.quantidade / totalEntradas) * 100)
+                          : 0;
+                          
+                        const cores = ['#4285F4', '#FBBC05', '#EA4335', '#9C27B0', '#00ACC1'];
+                        
+                        return (
+                          <div key={index} className="grafico-item">
+                            <div className="grafico-label">
+                              {entrada.anuncio}
+                            </div>
+                            <div className="stats-bar-container">
+                              <div 
+                                className="stats-bar" 
+                                style={{ 
+                                  width: `${porcentagem}%`,
+                                  backgroundColor: cores[index % cores.length]
+                                }}
+                              >
+                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                              </div>
+                            </div>
+                            <div className="grafico-value">
+                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    Nenhuma entrada detalhada encontrada para esta data e link.
+                  </div>
+                )}
+              </div>
+              
+              {/* Nova seção: Entradas por Plataforma */}
+              <div className="entradas-detalhadas-section">
+                <h3>Entradas Detalhadas por Plataforma</h3>
+                {loadingEntradas ? (
+                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
+                ) : entradasDetalhadas.porPlataforma.length > 0 ? (
+                  <div className="entradas-detalhadas-container">
+                    <table className="entradas-table">
+                      <thead>
+                        <tr>
+                          <th>Plataforma</th>
+                          <th>Quantidade</th>
+                          <th>%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entradasDetalhadas.porPlataforma.map((entrada, index) => {
+                          // Calcular porcentagem em relação ao total
+                          const totalEntradas = entradasDetalhadas.porPlataforma.reduce((sum, item) => sum + item.quantidade, 0);
+                          const porcentagem = totalEntradas > 0 
+                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
+                            : '0.00';
+                            
+                          // Determinar cor com base na porcentagem
+                          const getCorPorcentagem = (valor) => {
+                            if (valor >= 50) return '#34a853'; // Verde - Excelente
+                            if (valor >= 30) return '#4285F4'; // Azul - Bom
+                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
+                            return '#EA4335'; // Vermelho - Baixo
+                          };
+                          
+                          return (
+                            <tr key={index}>
+                              <td>{entrada.plataforma}</td>
+                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
+                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
+                                {porcentagem}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    
+                    {/* Gráfico de barras para entradas por plataforma */}
+                    <div className="entradas-grafico">
+                      <h4>Distribuição de Entradas por Plataforma</h4>
+                      {entradasDetalhadas.porPlataforma.slice(0, 5).map((entrada, index) => {
+                        const totalEntradas = entradasDetalhadas.porPlataforma.reduce((sum, item) => sum + item.quantidade, 0);
+                        const porcentagem = totalEntradas > 0 
+                          ? ((entrada.quantidade / totalEntradas) * 100)
+                          : 0;
+                          
+                        const cores = ['#FBBC05', '#EA4335', '#9C27B0', '#00ACC1', '#34a853'];
+                        
+                        return (
+                          <div key={index} className="grafico-item">
+                            <div className="grafico-label">
+                              {entrada.plataforma}
+                            </div>
+                            <div className="stats-bar-container">
+                              <div 
+                                className="stats-bar" 
+                                style={{ 
+                                  width: `${porcentagem}%`,
+                                  backgroundColor: cores[index % cores.length]
+                                }}
+                              >
+                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                              </div>
+                            </div>
+                            <div className="grafico-value">
+                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    Nenhuma entrada detalhada encontrada para esta data e link.
+                  </div>
+                )}
+              </div>
+              
+              {/* Nova seção: Entradas por URL LP */}
+              <div className="entradas-detalhadas-section">
+                <h3>Entradas Detalhadas por URL de Landing Page</h3>
+                {loadingEntradas ? (
+                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
+                ) : entradasDetalhadas.porUrlLp.length > 0 ? (
+                  <div className="entradas-detalhadas-container">
+                    <table className="entradas-table">
+                      <thead>
+                        <tr>
+                          <th>URL Landing Page</th>
+                          <th>Quantidade</th>
+                          <th>%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entradasDetalhadas.porUrlLp.map((entrada, index) => {
+                          // Calcular porcentagem em relação ao total
+                          const totalEntradas = entradasDetalhadas.porUrlLp.reduce((sum, item) => sum + item.quantidade, 0);
+                          const porcentagem = totalEntradas > 0 
+                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
+                            : '0.00';
+                            
+                          // Determinar cor com base na porcentagem
+                          const getCorPorcentagem = (valor) => {
+                            if (valor >= 50) return '#34a853'; // Verde - Excelente
+                            if (valor >= 30) return '#4285F4'; // Azul - Bom
+                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
+                            return '#EA4335'; // Vermelho - Baixo
+                          };
+                          
+                          return (
+                            <tr key={index}>
+                              <td>{entrada.url_lp}</td>
+                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
+                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
+                                {porcentagem}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    
+                    {/* Gráfico de barras para entradas por URL LP */}
+                    <div className="entradas-grafico">
+                      <h4>Distribuição de Entradas por URL de Landing Page</h4>
+                      {entradasDetalhadas.porUrlLp.slice(0, 5).map((entrada, index) => {
+                        const totalEntradas = entradasDetalhadas.porUrlLp.reduce((sum, item) => sum + item.quantidade, 0);
+                        const porcentagem = totalEntradas > 0 
+                          ? ((entrada.quantidade / totalEntradas) * 100)
+                          : 0;
+                          
+                        const cores = ['#EA4335', '#9C27B0', '#00ACC1', '#34a853', '#4285F4'];
+                        
+                        return (
+                          <div key={index} className="grafico-item">
+                            <div className="grafico-label">
+                              {entrada.url_lp}
+                            </div>
+                            <div className="stats-bar-container">
+                              <div 
+                                className="stats-bar" 
+                                style={{ 
+                                  width: `${porcentagem}%`,
+                                  backgroundColor: cores[index % cores.length]
+                                }}
+                              >
+                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                              </div>
+                            </div>
+                            <div className="grafico-value">
+                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    Nenhuma entrada detalhada encontrada para esta data e link.
                   </div>
                 )}
               </div>
