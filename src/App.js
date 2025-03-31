@@ -10,18 +10,54 @@ const supabase = createClient(
 
 // Componente de Login
 const LoginScreen = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const correctPassword = 'Bravobet2025!';
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (password === correctPassword) {
+    setLoading(true);
+    setError('');
+    
+    try {
+      console.log("Tentando fazer login com:", email, password);
+      
+      // Autenticação via Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+      
+      console.log("Resposta do Supabase:", data, error);
+      
+      if (error) throw error;
+      
+      // Verificar se o usuário existe na tabela bravobet_users
+      const { data: userData, error: userError } = await supabase
+        .from('bravobet_users')
+        .select('*')
+        .eq('email', email)
+        .single();
+      
+      if (userError || !userData) {
+        // Usuário não está cadastrado na aplicação
+        await supabase.auth.signOut(); // Fazer logout do Auth
+        throw new Error('Usuário não autorizado para esta aplicação');
+      }
+      
       // Salvar no localStorage para manter o login entre sessões
       localStorage.setItem('dashboardAuthenticated', 'true');
-      onLogin();
-    } else {
-      setError('Senha incorreta. Tente novamente.');
+      localStorage.setItem('dashboardUser', JSON.stringify(data.user));
+      localStorage.setItem('userType', userData.tipo); // Armazenar o tipo (admin/user)
+      localStorage.setItem('userId', data.user.id); // Armazenar o ID do usuário
+      
+      onLogin(data.user);
+    } catch (error) {
+      console.error('Erro ao fazer login:', error.message);
+      setError('Credenciais inválidas ou usuário não autorizado. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -29,20 +65,28 @@ const LoginScreen = ({ onLogin }) => {
     <div className="login-overlay">
       <div className="login-container">
         <h2 className="login-title">Trackeador Telegram - BravoBet</h2>
-        <p className="login-subtitle">Digite a senha para acessar o sistema</p>
+        <p className="login-subtitle">Digite suas credenciais para acessar o sistema</p>
         
         <form onSubmit={handleSubmit} className="login-form">
           <input
+            type="email"
+            className="login-input"
+            placeholder="E-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
             type="password"
             className="login-input"
-            placeholder="Digite a senha"
+            placeholder="Senha"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
           
-          <button type="submit" className="login-button">
-            Acessar
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? 'Carregando...' : 'Acessar'}
           </button>
           
           {error && <p className="login-error">{error}</p>}
@@ -87,8 +131,37 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
     pixel_id: '',
     id_channel_telegram: '',
     bio_ou_externo: false,
+    selected_user_id: '',
     ...initialData
   });
+  const [users, setUsers] = useState([]);
+  const userType = localStorage.getItem('userType');
+  
+  // Buscar usuários se for admin e estiver editando (initialData tem id)
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (userType === 'admin' && initialData.id) {
+        try {
+          const { data, error } = await supabase
+            .from('bravobet_users')
+            .select('*')
+            .eq('tipo', 'user');
+            
+          if (error) throw error;
+          setUsers(data || []);
+          
+          // Se o link já tem um user_id, selecionar ele no dropdown
+          if (initialData.user_id) {
+            setFormData(prev => ({ ...prev, selected_user_id: initialData.user_id }));
+          }
+        } catch (err) {
+          console.error('Erro ao buscar usuários:', err.message);
+        }
+      }
+    };
+    
+    fetchUsers();
+  }, [userType, initialData.id, initialData.user_id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -125,6 +198,29 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
 
   return (
     <form onSubmit={handleSubmit}>
+      {/* Campo para selecionar usuário (apenas para admins na edição) */}
+      {userType === 'admin' && initialData.id && (
+        <div className="form-group">
+          <label className="form-label">Usuário Proprietário:</label>
+          <select 
+            name="selected_user_id"
+            className="form-input"
+            value={formData.selected_user_id || ''}
+            onChange={handleChange}
+          >
+            <option value="">Selecione um usuário</option>
+            {users.map(user => (
+              <option key={user.id} value={user.id}>
+                {user.email}
+              </option>
+            ))}
+          </select>
+          <div className="form-instructions">
+            <p>Altere o usuário proprietário deste link.</p>
+          </div>
+        </div>
+      )}
+      
       {/* Campo ID do Canal Telegram */}
       {renderFieldWithInstructions(
         'id_channel_telegram',
@@ -251,7 +347,8 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
           key !== 'expert_apelido' &&
           key !== 'lead_count' &&
           key !== 'created_at' &&
-          key !== 'bio_ou_externo'
+          key !== 'bio_ou_externo' &&
+          key !== 'selected_user_id'
         )
         .map((field) => (
           <div className="form-group" key={field}>
@@ -277,31 +374,97 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
 
 // Componente de Cadastro
 const CadastroForm = ({ onCadastroSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const userType = localStorage.getItem('userType');
+  const currentUserId = localStorage.getItem('userId');
+
+  // Buscar usuários do tipo 'user' se o usuário atual for admin
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (userType === 'admin') {
+        try {
+          const { data, error } = await supabase
+            .from('bravobet_users')
+            .select('*')
+            .eq('tipo', 'user');
+            
+          if (error) throw error;
+          setUsers(data || []);
+        } catch (err) {
+          console.error('Erro ao buscar usuários:', err.message);
+        }
+      }
+    };
+    
+    fetchUsers();
+  }, [userType]);
+
   const handleSubmit = async (formData) => {
     try {
+      setLoading(true);
+      setError('');
+      
+      // Determinar o user_id com base no tipo de usuário
+      let user_id = currentUserId;
+      
+      // Se for admin e selecionou um usuário, usar o ID do usuário selecionado
+      if (userType === 'admin' && selectedUserId) {
+        user_id = selectedUserId;
+      }
+      
       const { error } = await supabase
         .from('bravobet_links_personalizados')
         .insert([{ 
-          ...formData, 
+          ...formData,
+          user_id: user_id,
           quantidade_entrada: 0,
           entrada_total_grupo: 0,
           saidas_totais: 0,
-          saidas_que_usaram_link: 0,
-          created_at: new Date().toISOString()
+          saidas_que_usaram_link: 0
         }]);
 
       if (error) throw error;
       alert('Link cadastrado com sucesso!');
-      if (onCadastroSuccess) onCadastroSuccess();
+      onCadastroSuccess();
     } catch (error) {
-      alert('Erro ao cadastrar: ' + error.message);
+      setError('Erro ao cadastrar: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="form-container">
-      <h2 className="form-title">Cadastro de Link Personalizado</h2>
-      <LinkForm onSubmit={handleSubmit} />
+      <h2 className="form-title">Cadastrar Novo Link</h2>
+      
+      {userType === 'admin' && (
+        <div className="form-group">
+          <label className="form-label">Atribuir a Usuário:</label>
+          <select 
+            className="form-input"
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+          >
+            <option value="">Selecione um usuário (opcional)</option>
+            {users.map(user => (
+              <option key={user.id} value={user.id}>
+                {user.email}
+              </option>
+            ))}
+          </select>
+          <div className="form-instructions">
+            <p>Se não selecionar um usuário, o link será atribuído a você.</p>
+          </div>
+        </div>
+      )}
+      
+      <LinkForm onSubmit={handleSubmit} buttonText="Cadastrar" />
+      
+      {error && <div className="error-message">{error}</div>}
+      {loading && <div className="loading-message">Cadastrando...</div>}
     </div>
   );
 };
@@ -339,14 +502,25 @@ const Dashboard = () => {
   const fetchLinks = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bravobet_links_personalizados')
-        .select('*');
+      
+      // Obter o tipo de usuário e ID do localStorage
+      const userType = localStorage.getItem('userType');
+      const userId = localStorage.getItem('userId');
+      
+      // Construir a consulta com base no tipo de usuário
+      let query = supabase.from('bravobet_links_personalizados').select('*');
+      
+      // Se não for admin, filtrar apenas os links do usuário
+      if (userType !== 'admin') {
+        query = query.eq('user_id', userId);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
       
       // Buscar contagem de leads para cada link
-      const linksWithLeadCount = await Promise.all(data.map(async (link) => {
+      const linksWithLeadCount = await Promise.all((data || []).map(async (link) => {
         const { count, error: countError } = await supabase
           .from('bravobet_leads_telegram')
           .select('id', { count: 'exact', head: true })
@@ -380,6 +554,11 @@ const Dashboard = () => {
     try {
       // Remover campos que não existem na tabela
       const { lead_count, ...dataToUpdate } = formData;
+      
+      // Se for admin e tiver um usuário selecionado para edição, atualizar o user_id
+      if (formData.selected_user_id) {
+        dataToUpdate.user_id = formData.selected_user_id;
+      }
       
       const { error } = await supabase
         .from('bravobet_links_personalizados')
@@ -762,7 +941,11 @@ const EstatisticasGerais = () => {
     expertStats: [],
     groupStats: []
   });
-
+  
+  // Obter o tipo de usuário e ID do localStorage
+  const userType = localStorage.getItem('userType');
+  const userId = localStorage.getItem('userId');
+  
   // Função para determinar cor com base no desempenho
   const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
     const numValue = parseFloat(value);
@@ -864,8 +1047,9 @@ const EstatisticasGerais = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('bravobet_links_personalizados')
-        .select('*');
-
+        .select('*')
+        .eq('user_id', userId);
+      
       if (error) throw error;
       
       // Buscar contagem de leads para cada link
@@ -889,7 +1073,7 @@ const EstatisticasGerais = () => {
     } finally {
       setLoading(false);
     }
-  }, [calculateStats]);
+  }, [calculateStats, userId]);
 
   useEffect(() => {
     fetchLinks();
@@ -1105,6 +1289,8 @@ const RelatoriosDiarios = () => {
     porUrlLp: []
   });
   const [loadingEntradas, setLoadingEntradas] = useState(false);
+  const userType = localStorage.getItem('userType');
+  const userId = localStorage.getItem('userId');
 
   const getColorByPerformance = (value) => {
     if (value >= 80) return '#34a853'; // Verde - Excelente
@@ -1358,9 +1544,16 @@ const RelatoriosDiarios = () => {
     const fetchLinks = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('bravobet_links_personalizados')
-          .select('id, nome_link, expert_apelido');
+        
+        // Construir a consulta com base no tipo de usuário
+        let query = supabase.from('bravobet_links_personalizados').select('id, nome_link, expert_apelido');
+        
+        // Se não for admin, filtrar apenas os links do usuário
+        if (userType !== 'admin') {
+          query = query.eq('user_id', userId);
+        }
+        
+        const { data, error } = await query;
 
         if (error) throw error;
         setLinks(data || []);
@@ -1372,7 +1565,7 @@ const RelatoriosDiarios = () => {
     };
 
     fetchLinks();
-  }, []);
+  }, [userType, userId]);
 
   return (
     <div className="dashboard-container">
@@ -1395,6 +1588,9 @@ const RelatoriosDiarios = () => {
               </option>
             ))}
           </select>
+          <div className="form-instructions">
+            <p>Selecione um link para visualizar o relatório.</p>
+          </div>
         </div>
 
         <div className="filtro-grupo">
@@ -1723,7 +1919,9 @@ const RelatoriosDiarios = () => {
                                   backgroundColor: cores[index % cores.length]
                                 }}
                               >
-                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                                {porcentagem > 10
+                                  ? `${porcentagem.toFixed(2)}%` 
+                                  : ''}
                               </div>
                             </div>
                             <div className="grafico-value">
@@ -1809,7 +2007,9 @@ const RelatoriosDiarios = () => {
                                   backgroundColor: cores[index % cores.length]
                                 }}
                               >
-                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                                {porcentagem > 10
+                                  ? `${porcentagem.toFixed(2)}%` 
+                                  : ''}
                               </div>
                             </div>
                             <div className="grafico-value">
@@ -1895,7 +2095,9 @@ const RelatoriosDiarios = () => {
                                   backgroundColor: cores[index % cores.length]
                                 }}
                               >
-                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                                {porcentagem > 10
+                                  ? `${porcentagem.toFixed(2)}%` 
+                                  : ''}
                               </div>
                             </div>
                             <div className="grafico-value">
@@ -1981,7 +2183,9 @@ const RelatoriosDiarios = () => {
                                   backgroundColor: cores[index % cores.length]
                                 }}
                               >
-                                {porcentagem > 10 ? `${porcentagem.toFixed(2)}%` : ''}
+                                {porcentagem > 10
+                                  ? `${porcentagem.toFixed(2)}%` 
+                                  : ''}
                               </div>
                             </div>
                             <div className="grafico-value">
@@ -2018,17 +2222,45 @@ const App = () => {
 
   useEffect(() => {
     // Verificar se o usuário já está autenticado
-    const authenticated = localStorage.getItem('dashboardAuthenticated') === 'true';
-    setIsAuthenticated(authenticated);
+    const checkAuth = async () => {
+      try {
+        // Verificar se há uma sessão ativa no Supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          console.log("Sessão encontrada:", session);
+          setIsAuthenticated(true);
+          return;
+        }
+        
+        // Se não houver sessão, verificar localStorage como fallback
+        const authenticated = localStorage.getItem('dashboardAuthenticated') === 'true';
+        setIsAuthenticated(authenticated);
+      } catch (error) {
+        console.error("Erro ao verificar autenticação:", error);
+        // Fallback para localStorage
+        const authenticated = localStorage.getItem('dashboardAuthenticated') === 'true';
+        setIsAuthenticated(authenticated);
+      }
+    };
+    
+    checkAuth();
   }, []);
 
-  const handleLogin = () => {
+  const handleLogin = (user) => {
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('dashboardAuthenticated');
-    setIsAuthenticated(false);
+    // Fazer logout no Supabase
+    supabase.auth.signOut().then(() => {
+      // Limpar localStorage
+      localStorage.removeItem('dashboardAuthenticated');
+      localStorage.removeItem('dashboardUser');
+      setIsAuthenticated(false);
+    }).catch(error => {
+      console.error("Erro ao fazer logout:", error);
+    });
   };
 
   if (!isAuthenticated) {
