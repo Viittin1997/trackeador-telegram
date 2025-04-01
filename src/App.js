@@ -50,7 +50,12 @@ const LoginScreen = ({ onLogin }) => {
       localStorage.setItem('dashboardAuthenticated', 'true');
       localStorage.setItem('dashboardUser', JSON.stringify(data.user));
       localStorage.setItem('userType', userData.tipo); // Armazenar o tipo (admin/user)
-      localStorage.setItem('userId', data.user.id); // Armazenar o ID do usuário
+      localStorage.setItem('userId', userData.id); // Armazenar o ID do usuário da tabela bravobet_users
+      
+      console.log('Login bem-sucedido:');
+      console.log('- ID do usuário (Auth):', data.user.id);
+      console.log('- ID do usuário (DB):', userData.id);
+      console.log('- Tipo do usuário:', userData.tipo);
       
       onLogin(data.user);
     } catch (error) {
@@ -510,17 +515,31 @@ const Dashboard = () => {
       const userType = localStorage.getItem('userType');
       const userId = localStorage.getItem('userId');
       
+      console.log('Dashboard - Tipo de usuário:', userType);
+      console.log('Dashboard - ID do usuário:', userId);
+      console.log('Dashboard - Tipo do ID:', typeof userId);
+      
       // Construir a consulta com base no tipo de usuário
       let query = supabase.from('bravobet_links_personalizados').select('*');
       
       // Se não for admin, filtrar apenas os links do usuário
       if (userType !== 'admin') {
-        query = query.eq('user_id', userId);
+        // Usar o ID como número para compatibilidade com o banco de dados
+        query = query.eq('user_id', Number(userId));
+        console.log('Dashboard - ID convertido para número:', Number(userId));
+      } else {
+        console.log('Dashboard - Usuário é admin, mostrando todos os links');
       }
       
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Dashboard - Erro na consulta:', error);
+        throw error;
+      }
+      
+      console.log('Dashboard - Links retornados:', data);
+      console.log('Dashboard - Quantidade de links:', data ? data.length : 0);
       
       // Buscar contagem de leads para cada link
       const linksWithLeadCount = await Promise.all((data || []).map(async (link) => {
@@ -668,6 +687,68 @@ const Dashboard = () => {
       dailyColor
     };
   }, [getColorByPerformance]);
+
+  // Adicionar função de diagnóstico detalhada
+  const runDiagnostics = async () => {
+    try {
+      console.log('Iniciando diagnóstico detalhado...');
+      
+      // 1. Verificar o usuário atual
+      const userType = localStorage.getItem('userType');
+      const userId = localStorage.getItem('userId');
+      console.log('Usuário atual - Tipo:', userType);
+      console.log('Usuário atual - ID:', userId);
+      console.log('Usuário atual - Tipo do ID:', typeof userId);
+      
+      // 2. Verificar o link VINI_LP1
+      const { data: linkData, error: linkError } = await supabase
+        .from('bravobet_links_personalizados')
+        .select('*')
+        .eq('nome_link', 'VINI_LP1');
+      
+      if (linkError) {
+        console.error('Erro ao verificar link VINI_LP1:', linkError);
+      } else if (linkData && linkData.length > 0) {
+        console.log('Link VINI_LP1 encontrado:');
+        console.log('- ID:', linkData[0].id);
+        console.log('- Nome:', linkData[0].nome_link);
+        console.log('- user_id:', linkData[0].user_id);
+        console.log('- Tipo do user_id:', typeof linkData[0].user_id);
+      } else {
+        console.log('Link VINI_LP1 não encontrado');
+      }
+      
+      // 3. Testar consulta direta com o ID do usuário atual
+      if (userId) {
+        console.log('Testando consulta direta com o ID do usuário atual...');
+        
+        // Teste com o ID como está no localStorage
+        const { data: testRaw, error: errorRaw } = await supabase
+          .from('bravobet_links_personalizados')
+          .select('*')
+          .eq('user_id', userId);
+        
+        console.log('Consulta com user_id como está no localStorage:', testRaw ? testRaw.length : 0, 'resultados');
+        
+        // Teste com o ID como número
+        const { data: testNumber, error: errorNumber } = await supabase
+          .from('bravobet_links_personalizados')
+          .select('*')
+          .eq('user_id', Number(userId));
+        
+        console.log('Consulta com user_id como número:', testNumber ? testNumber.length : 0, 'resultados');
+        if (testNumber && testNumber.length > 0) {
+          console.log('Primeiro link encontrado:', testNumber[0].nome_link);
+        }
+      }
+    } catch (error) {
+      console.error('Erro no diagnóstico:', error);
+    }
+  };
+
+  useEffect(() => {
+    runDiagnostics();
+  }, []);
 
   return (
     <div className="dashboard-container">
@@ -1054,7 +1135,7 @@ const EstatisticasGerais = () => {
       
       // Se não for admin, filtrar apenas os links do usuário
       if (userType !== 'admin') {
-        query = query.eq('user_id', userId);
+        query = query.eq('user_id', Number(userId)); // Converter o ID para número
       }
       
       const { data, error } = await query;
@@ -1559,7 +1640,7 @@ const RelatoriosDiarios = () => {
         
         // Se não for admin, filtrar apenas os links do usuário
         if (userType !== 'admin') {
-          query = query.eq('user_id', userId);
+          query = query.eq('user_id', Number(userId)); // Converter o ID para número
         }
         
         const { data, error } = await query;
