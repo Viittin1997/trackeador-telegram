@@ -415,10 +415,13 @@ const CadastroForm = ({ onCadastroSuccess }) => {
         user_id = selectedUserId;
       }
       
+      // Remover o campo selected_user_id do formData para evitar erro
+      const { selected_user_id, ...dataToInsert } = formData;
+      
       const { error } = await supabase
         .from('bravobet_links_personalizados')
         .insert([{ 
-          ...formData,
+          ...dataToInsert,
           user_id: user_id,
           quantidade_entrada: 0,
           entrada_total_grupo: 0,
