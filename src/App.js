@@ -701,29 +701,19 @@ const Dashboard = () => {
       console.log('Usuário atual - Tipo do ID:', typeof userId);
       
       // 2. Verificar o link VINI_LP1
-      const { data: linkData, error: linkError } = await supabase
+      const { data: linkData } = await supabase
         .from('bravobet_links_personalizados')
         .select('*')
         .eq('nome_link', 'VINI_LP1');
       
-      if (linkError) {
-        console.error('Erro ao verificar link VINI_LP1:', linkError);
-      } else if (linkData && linkData.length > 0) {
-        console.log('Link VINI_LP1 encontrado:');
-        console.log('- ID:', linkData[0].id);
-        console.log('- Nome:', linkData[0].nome_link);
-        console.log('- user_id:', linkData[0].user_id);
-        console.log('- Tipo do user_id:', typeof linkData[0].user_id);
-      } else {
-        console.log('Link VINI_LP1 não encontrado');
-      }
+      console.log('Link VINI_LP1 encontrado:', linkData);
       
       // 3. Testar consulta direta com o ID do usuário atual
       if (userId) {
         console.log('Testando consulta direta com o ID do usuário atual...');
         
         // Teste com o ID como está no localStorage
-        const { data: testRaw, error: errorRaw } = await supabase
+        const { data: testRaw } = await supabase
           .from('bravobet_links_personalizados')
           .select('*')
           .eq('user_id', userId);
@@ -731,7 +721,7 @@ const Dashboard = () => {
         console.log('Consulta com user_id como está no localStorage:', testRaw ? testRaw.length : 0, 'resultados');
         
         // Teste com o ID como número
-        const { data: testNumber, error: errorNumber } = await supabase
+        const { data: testNumber } = await supabase
           .from('bravobet_links_personalizados')
           .select('*')
           .eq('user_id', Number(userId));
