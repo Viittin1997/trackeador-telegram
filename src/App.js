@@ -1359,7 +1359,8 @@ const RelatoriosDiarios = () => {
   const [loading, setLoading] = useState(false);
   const [links, setLinks] = useState([]);
   const [selectedLink, setSelectedLink] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [relatorio, setRelatorio] = useState(null);
   const [error, setError] = useState('');
   const [buscaRealizada, setBuscaRealizada] = useState(false);
@@ -1452,8 +1453,14 @@ const RelatoriosDiarios = () => {
   }, [valorInvestido, relatorio]);
 
   const buscarRelatorio = async () => {
-    if (!selectedLink || !selectedDate) {
-      setError('Por favor, selecione um link e uma data.');
+    if (!selectedLink || !startDate || !endDate) {
+      setError('Por favor, selecione um link e um período de datas.');
+      return;
+    }
+
+    // Verificar se a data final é maior ou igual à data inicial
+    if (new Date(endDate) < new Date(startDate)) {
+      setError('A data final deve ser maior ou igual à data inicial.');
       return;
     }
 
@@ -1465,54 +1472,70 @@ const RelatoriosDiarios = () => {
       
       console.log('Buscando relatório para:', {
         link: selectedLink,
-        data: selectedDate
+        dataInicio: startDate,
+        dataFim: endDate
       });
       
       // Buscar todos os relatórios e filtrar no lado do cliente
       const { data, error } = await supabase
         .from('bravobet_metricas_diarias')
-        .select('*');
+        .select('*')
+        .gte('data_formatada', startDate)
+        .lte('data_formatada', endDate);
       
       if (error) {
         throw error;
       }
       
-      console.log('Todos os relatórios:', data);
+      console.log('Relatórios encontrados no período:', data);
       
-      // Filtrar no lado do cliente para garantir que encontramos o relatório
-      let relatorioEncontrado = null;
+      // Filtrar por link
+      let relatoriosFiltrados = [];
       
       if (data && data.length > 0) {
-        console.log("Estrutura completa do primeiro relatório:", JSON.stringify(data[0]));
-        
         // Primeiro tentamos uma correspondência exata
-        relatorioEncontrado = data.find(item => 
-          item.nome_link === selectedLink && 
-          item.data_formatada === selectedDate
+        relatoriosFiltrados = data.filter(item => 
+          item.nome_link === selectedLink
         );
         
         // Se não encontrar, tentamos uma correspondência parcial case-insensitive
-        if (!relatorioEncontrado) {
-          relatorioEncontrado = data.find(item => 
+        if (relatoriosFiltrados.length === 0) {
+          relatoriosFiltrados = data.filter(item => 
             item.nome_link && selectedLink &&
-            item.nome_link.toLowerCase().includes(selectedLink.toLowerCase()) && 
-            item.data_formatada === selectedDate
-          );
-        }
-        
-        // Se ainda não encontrar, tentamos apenas pela data
-        if (!relatorioEncontrado) {
-          relatorioEncontrado = data.find(item => 
-            item.data_formatada === selectedDate
+            item.nome_link.toLowerCase().includes(selectedLink.toLowerCase())
           );
         }
       }
       
-      console.log('Relatório encontrado:', relatorioEncontrado);
-      setRelatorio(relatorioEncontrado);
+      console.log('Relatórios filtrados por link:', relatoriosFiltrados);
+      
+      if (relatoriosFiltrados.length === 0) {
+        setRelatorio(null);
+      } else {
+        // Agregar os dados de todos os relatórios encontrados
+        const relatorioAgregado = {
+          nome_link: selectedLink,
+          data_formatada: `${startDate} a ${endDate}`,
+          entradas_link: 0,
+          entradas_totais: 0,
+          saidas_link: 0,
+          saidas_totais: 0,
+          created_at: new Date().toISOString()
+        };
+        
+        relatoriosFiltrados.forEach(rel => {
+          relatorioAgregado.entradas_link += rel.entradas_link || 0;
+          relatorioAgregado.entradas_totais += rel.entradas_totais || 0;
+          relatorioAgregado.saidas_link += rel.saidas_link || 0;
+          relatorioAgregado.saidas_totais += rel.saidas_totais || 0;
+        });
+        
+        console.log('Relatório agregado:', relatorioAgregado);
+        setRelatorio(relatorioAgregado);
+      }
       
       // Buscar entradas detalhadas da nova tabela
-      await buscarEntradasDetalhadas(selectedDate, selectedLink);
+      await buscarEntradasDetalhadas(startDate, endDate, selectedLink);
       
     } catch (error) {
       console.error('Erro ao buscar relatório:', error.message);
@@ -1523,7 +1546,7 @@ const RelatoriosDiarios = () => {
   };
   
   // Função para buscar e agrupar entradas detalhadas
-  const buscarEntradasDetalhadas = async (data, link) => {
+  const buscarEntradasDetalhadas = async (startDate, endDate, link) => {
     try {
       setLoadingEntradas(true);
       
@@ -1531,7 +1554,8 @@ const RelatoriosDiarios = () => {
       const { data: entradasData, error: entradasError } = await supabase
         .from('bravobet_registro_de_entrada')
         .select('*')
-        .eq('data_formatada', data);
+        .gte('data_formatada', startDate)
+        .lte('data_formatada', endDate);
       
       if (entradasError) {
         throw entradasError;
@@ -1677,12 +1701,22 @@ const RelatoriosDiarios = () => {
         </div>
 
         <div className="filtro-grupo">
-          <label className="filtro-label">Data:</label>
+          <label className="filtro-label">Data Inicial:</label>
           <input
             type="date"
             className="filtro-input"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+
+        <div className="filtro-grupo">
+          <label className="filtro-label">Data Final:</label>
+          <input
+            type="date"
+            className="filtro-input"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
 
@@ -1712,7 +1746,7 @@ const RelatoriosDiarios = () => {
         <div className="relatorio-container">
           {relatorio ? (
             <div className="relatorio-card">
-              <h3>Relatório de {selectedDate}</h3>
+              <h3>Relatório de {startDate} a {endDate}</h3>
               <h4>Link: {selectedLink}</h4>
               
               <div className="relatorio-stats">
@@ -2288,7 +2322,7 @@ const RelatoriosDiarios = () => {
             </div>
           ) : (
             <div className="no-data-message">
-              <p>Não há relatório disponível para o link <strong>{selectedLink}</strong> na data <strong>{selectedDate}</strong>.</p>
+              <p>Não há relatório disponível para o link <strong>{selectedLink}</strong> na data <strong>{startDate}</strong> a <strong>{endDate}</strong>.</p>
               <p>Os relatórios são gerados automaticamente ao final de cada dia.</p>
             </div>
           )}
