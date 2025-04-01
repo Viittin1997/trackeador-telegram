@@ -1045,10 +1045,16 @@ const EstatisticasGerais = () => {
   const fetchLinks = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bravobet_links_personalizados')
-        .select('*')
-        .eq('user_id', userId);
+      
+      // Construir a consulta com base no tipo de usuário
+      let query = supabase.from('bravobet_links_personalizados').select('*');
+      
+      // Se não for admin, filtrar apenas os links do usuário
+      if (userType !== 'admin') {
+        query = query.eq('user_id', userId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       
@@ -1073,7 +1079,7 @@ const EstatisticasGerais = () => {
     } finally {
       setLoading(false);
     }
-  }, [calculateStats, userId]);
+  }, [calculateStats, userType, userId]);
 
   useEffect(() => {
     fetchLinks();
