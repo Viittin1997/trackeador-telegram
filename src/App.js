@@ -21,11 +21,14 @@ const LoginScreen = ({ onLogin }) => {
     setError('');
     
     try {
-      console.log("Tentando fazer login com:", email, password);
+      // Converter o email para minúsculas para evitar problemas de case sensitivity
+      const emailLowerCase = email.toLowerCase();
+      
+      console.log("Tentando fazer login com:", emailLowerCase, password);
       
       // Autenticação via Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
+        email: emailLowerCase,
         password: password,
       });
       
@@ -37,7 +40,7 @@ const LoginScreen = ({ onLogin }) => {
       const { data: userData, error: userError } = await supabase
         .from('bravobet_users')
         .select('*')
-        .eq('email', email)
+        .eq('email', emailLowerCase)
         .single();
       
       if (userError || !userData) {
@@ -1230,7 +1233,7 @@ const EstatisticasGerais = () => {
                 >
                   {calcularTaxaConversao() > 10
                     ? `${calcularTaxaConversao()}%` 
-                    : ''}
+                    : '0%'}
                 </div>
               </div>
             </div>
@@ -1250,7 +1253,7 @@ const EstatisticasGerais = () => {
                 >
                   {calcularTaxaSaida() > 10
                     ? `${calcularTaxaSaida()}%` 
-                    : ''}
+                    : '0%'}
                 </div>
               </div>
             </div>
@@ -1755,7 +1758,7 @@ const RelatoriosDiarios = () => {
                     }}>
                       {relatorio.entradas_totais > 0 
                         ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : 'N/A'}
+                        : '0%'}
                     </span>
                   </div>
                 </div>
@@ -1773,7 +1776,7 @@ const RelatoriosDiarios = () => {
                     }}>
                       {relatorio.entradas_link > 0 && relatorio.entradas_totais > 0
                         ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%`
-                        : 'N/A'}
+                        : '0%'}
                     </span>
                   </div>
                 </div>
@@ -1814,7 +1817,7 @@ const RelatoriosDiarios = () => {
                     >
                       {relatorio.entradas_totais > 0 && ((relatorio.entradas_link / relatorio.entradas_totais) * 100) > 10
                         ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : ''}
+                        : '0%'}
                     </div>
                   </div>
                   
@@ -1831,7 +1834,7 @@ const RelatoriosDiarios = () => {
                     >
                       {relatorio.entradas_totais > 0 && (((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100) > 10
                         ? `${(((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : ''}
+                        : '0%'}
                     </div>
                   </div>
                   
@@ -1866,7 +1869,7 @@ const RelatoriosDiarios = () => {
                     >
                       {relatorio.saidas_totais > 0 && ((relatorio.saidas_link / relatorio.saidas_totais) * 100) > 10
                         ? `${((relatorio.saidas_link / relatorio.saidas_totais) * 100).toFixed(2)}%` 
-                        : ''}
+                        : '0%'}
                     </div>
                   </div>
                   
@@ -1883,7 +1886,7 @@ const RelatoriosDiarios = () => {
                     >
                       {relatorio.saidas_totais > 0 && (((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100) > 10
                         ? `${(((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100).toFixed(2)}%` 
-                        : ''}
+                        : '0%'}
                     </div>
                   </div>
                   
@@ -2001,7 +2004,7 @@ const RelatoriosDiarios = () => {
                               >
                                 {porcentagem > 10
                                   ? `${porcentagem.toFixed(2)}%` 
-                                  : ''}
+                                  : '0%'}
                               </div>
                             </div>
                             <div className="grafico-value">
@@ -2089,7 +2092,7 @@ const RelatoriosDiarios = () => {
                               >
                                 {porcentagem > 10
                                   ? `${porcentagem.toFixed(2)}%` 
-                                  : ''}
+                                  : '0%'}
                               </div>
                             </div>
                             <div className="grafico-value">
@@ -2177,7 +2180,7 @@ const RelatoriosDiarios = () => {
                               >
                                 {porcentagem > 10
                                   ? `${porcentagem.toFixed(2)}%` 
-                                  : ''}
+                                  : '0%'}
                               </div>
                             </div>
                             <div className="grafico-value">
@@ -2265,7 +2268,7 @@ const RelatoriosDiarios = () => {
                               >
                                 {porcentagem > 10
                                   ? `${porcentagem.toFixed(2)}%` 
-                                  : ''}
+                                  : '0%'}
                               </div>
                             </div>
                             <div className="grafico-value">
