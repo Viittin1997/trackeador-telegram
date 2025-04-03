@@ -12,12 +12,10 @@ const supabase = createClient(
 );
 
 // URLs dos webhooks n8n
-// eslint-disable-next-line
 const N8N_CADASTRO_WEBHOOK_URL = 'https://neweditor.meumenu2023.uk/webhook-test/cadastro_trackeador';
 const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
 
 // Componente de Login
-// eslint-disable-next-line
 const LoginScreen = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -2416,6 +2414,7 @@ const App = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [userModalData, setUserModalData] = useState({});
+  const [currentTab, setCurrentTab] = useState('links');
   
   const handleLogin = (user) => {
     setAuthenticated(true);
