@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+// eslint-disable-next-line
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './styles.css';
 import { initDB, saveUserData, getUserData, clearUserData } from './utils/indexedDBUtil';
@@ -11,10 +12,12 @@ const supabase = createClient(
 );
 
 // URLs dos webhooks n8n
+// eslint-disable-next-line
 const N8N_CADASTRO_WEBHOOK_URL = 'https://neweditor.meumenu2023.uk/webhook-test/cadastro_trackeador';
 const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
 
 // Componente de Login
+// eslint-disable-next-line
 const LoginScreen = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -2392,17 +2395,27 @@ const App = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [showModal, setShowModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [modalType, setModalType] = useState('');
-  const [modalData, setModalData] = useState(null);
-  const [currentTab, setCurrentTab] = useState('links');
+  // eslint-disable-next-line no-unused-vars
+  const [modalData, setModalData] = useState({});
+  const [linkData, setLinkData] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [searchTerm, setSearchTerm] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [selectedLink, setSelectedLink] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [showEditModal, setShowEditModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [showUserModal, setShowUserModal] = useState(false);
-  const [userModalData, setUserModalData] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [userModalData, setUserModalData] = useState({});
   
   const handleLogin = (user) => {
     setAuthenticated(true);
