@@ -12,7 +12,7 @@ const supabase = createClient(
 );
 
 // URLs dos webhooks n8n
-const N8N_CADASTRO_WEBHOOK_URL = 'https://neweditor.meumenu2023.uk/webhook-test/cadastro_trackeador';
+const N8N_CADASTRO_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/cadastro_trackeador';
 const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
 
 // Componente de Login
