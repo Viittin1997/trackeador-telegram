@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './styles.css';
+import { initDB, saveUserData, getUserData, clearUserData } from './utils/indexedDBUtil';
 
-// Inicialização do cliente Supabase
+// Inicialização do cliente Supabase (ainda usado para operações no banco de dados)
 const supabase = createClient(
   'https://apidb.meumenu2023.uk',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzAzMzg2ODAwLAogICJleHAiOiAxODYxMjM5NjAwCn0.kU_d1xlxfuEgkYMC0mYoiZHQpUvRE2EnilTZ7S0bfIM'
 );
+
+// URLs dos webhooks n8n
+const N8N_CADASTRO_WEBHOOK_URL = 'https://neweditor.meumenu2023.uk/webhook-test/cadastro_trackeador';
+const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
 
 // Componente de Login
 const LoginScreen = ({ onLogin }) => {
@@ -70,34 +76,49 @@ const LoginScreen = ({ onLogin }) => {
   };
 
   return (
-    <div className="login-overlay">
-      <div className="login-container">
-        <h2 className="login-title">Trackeador Telegram - BravoBet</h2>
-        <p className="login-subtitle">Digite suas credenciais para acessar o sistema</p>
-        
+    <div className="login-container">
+      <div className="login-logo">
+        <h1 style={{ color: '#142c8e', fontSize: '28px', fontWeight: '600' }}>BravoBet</h1>
+      </div>
+      <div className="login-form-container">
         <form onSubmit={handleSubmit} className="login-form">
-          <input
-            type="email"
-            className="login-input"
-            placeholder="E-mail"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            className="login-input"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          {error && <div className="error-message">{error}</div>}
           
-          <button type="submit" className="login-button" disabled={loading}>
-            {loading ? 'Carregando...' : 'Acessar'}
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Digite seu email"
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password">Senha</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Digite sua senha"
+              required
+            />
+          </div>
+          
+          <button 
+            type="submit" 
+            className="login-button" 
+            disabled={loading}
+          >
+            {loading ? 'Entrando...' : 'Entrar'}
           </button>
           
-          {error && <p className="login-error">{error}</p>}
+          <div className="signup-link">
+            Novo por aqui? <a href="/cadastro-usuarios">Cadastre-se</a>
+          </div>
         </form>
       </div>
     </div>
@@ -218,7 +239,7 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
           >
             <option value="">Selecione um usuário</option>
             {users.map(user => (
-              <option key={user.id} value={user.id}>
+              <option key={user.uu_id} value={user.uu_id}>
                 {user.email}
               </option>
             ))}
@@ -415,16 +436,22 @@ const CadastroForm = ({ onCadastroSuccess }) => {
       setLoading(true);
       setError('');
       
-      // Determinar o user_id com base no tipo de usuário
-      let user_id = currentUserId;
+      // Determinar o user_id com base no tipo de usuário e seleção
+      let user_id = null; // Inicialmente null para que seja visível para admins
       
-      // Se for admin e selecionou um usuário, usar o ID do usuário selecionado
+      // Se for admin e selecionou um usuário, usar o UUID do usuário selecionado
       if (userType === 'admin' && selectedUserId) {
-        user_id = selectedUserId;
+        user_id = selectedUserId; // Agora é uma string UUID
+      } 
+      // Se for usuário comum, sempre usar o próprio UUID
+      else if (userType === 'user') {
+        user_id = currentUserId; // Agora é uma string UUID
       }
       
       // Remover o campo selected_user_id do formData para evitar erro
       const { selected_user_id, ...dataToInsert } = formData;
+      
+      console.log('Cadastrando link com user_id:', user_id, 'tipo:', typeof user_id);
       
       const { error } = await supabase
         .from('bravobet_links_personalizados')
@@ -461,7 +488,7 @@ const CadastroForm = ({ onCadastroSuccess }) => {
           >
             <option value="">Selecione um usuário (opcional)</option>
             {users.map(user => (
-              <option key={user.id} value={user.id}>
+              <option key={user.uu_id} value={user.uu_id}>
                 {user.email}
               </option>
             ))}
@@ -514,22 +541,21 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
-      // Obter o tipo de usuário e ID do localStorage
+      // Obter o tipo de usuário e UUID do localStorage
       const userType = localStorage.getItem('userType');
       const userId = localStorage.getItem('userId');
       
       console.log('Dashboard - Tipo de usuário:', userType);
-      console.log('Dashboard - ID do usuário:', userId);
-      console.log('Dashboard - Tipo do ID:', typeof userId);
+      console.log('Dashboard - UUID do usuário:', userId);
+      console.log('Dashboard - Tipo do UUID:', typeof userId);
       
       // Construir a consulta com base no tipo de usuário
       let query = supabase.from('bravobet_links_personalizados').select('*');
       
       // Se não for admin, filtrar apenas os links do usuário
       if (userType !== 'admin') {
-        // Usar o ID como número para compatibilidade com o banco de dados
-        query = query.eq('user_id', Number(userId));
-        console.log('Dashboard - ID convertido para número:', Number(userId));
+        query = query.eq('user_id', userId); // Agora é uma string UUID
+        console.log('Dashboard - UUID convertido para string:', userId);
       } else {
         console.log('Dashboard - Usuário é admin, mostrando todos os links');
       }
@@ -582,7 +608,7 @@ const Dashboard = () => {
       
       // Se for admin e tiver um usuário selecionado para edição, atualizar o user_id
       if (formData.selected_user_id) {
-        dataToUpdate.user_id = formData.selected_user_id;
+        dataToUpdate.user_id = formData.selected_user_id; // Agora é uma string UUID
       }
       
       const { error } = await supabase
@@ -700,8 +726,8 @@ const Dashboard = () => {
       const userType = localStorage.getItem('userType');
       const userId = localStorage.getItem('userId');
       console.log('Usuário atual - Tipo:', userType);
-      console.log('Usuário atual - ID:', userId);
-      console.log('Usuário atual - Tipo do ID:', typeof userId);
+      console.log('Usuário atual - UUID:', userId);
+      console.log('Usuário atual - Tipo do UUID:', typeof userId);
       
       // 2. Verificar o link VINI_LP1
       const { data: linkData } = await supabase
@@ -711,11 +737,11 @@ const Dashboard = () => {
       
       console.log('Link VINI_LP1 encontrado:', linkData);
       
-      // 3. Testar consulta direta com o ID do usuário atual
+      // 3. Testar consulta direta com o UUID do usuário atual
       if (userId) {
-        console.log('Testando consulta direta com o ID do usuário atual...');
+        console.log('Testando consulta direta com o UUID do usuário atual...');
         
-        // Teste com o ID como está no localStorage
+        // Teste com o UUID como está no localStorage
         const { data: testRaw } = await supabase
           .from('bravobet_links_personalizados')
           .select('*')
@@ -723,15 +749,15 @@ const Dashboard = () => {
         
         console.log('Consulta com user_id como está no localStorage:', testRaw ? testRaw.length : 0, 'resultados');
         
-        // Teste com o ID como número
-        const { data: testNumber } = await supabase
+        // Teste com o UUID como UUID
+        const { data: testUUID } = await supabase
           .from('bravobet_links_personalizados')
           .select('*')
-          .eq('user_id', Number(userId));
-        
-        console.log('Consulta com user_id como número:', testNumber ? testNumber.length : 0, 'resultados');
-        if (testNumber && testNumber.length > 0) {
-          console.log('Primeiro link encontrado:', testNumber[0].nome_link);
+          .eq('user_id', userId);
+      
+        console.log('Consulta com user_id como UUID:', testUUID ? testUUID.length : 0, 'resultados');
+        if (testUUID && testUUID.length > 0) {
+          console.log('Primeiro link encontrado:', testUUID[0].nome_link);
         }
       }
     } catch (error) {
@@ -1019,7 +1045,7 @@ const EstatisticasGerais = () => {
     groupStats: []
   });
   
-  // Obter o tipo de usuário e ID do localStorage
+  // Obter o tipo de usuário e UUID do localStorage
   const userType = localStorage.getItem('userType');
   const userId = localStorage.getItem('userId');
   
@@ -1128,7 +1154,7 @@ const EstatisticasGerais = () => {
       
       // Se não for admin, filtrar apenas os links do usuário
       if (userType !== 'admin') {
-        query = query.eq('user_id', Number(userId)); // Converter o ID para número
+        query = query.eq('user_id', userId); // Agora é uma string UUID
       }
       
       const { data, error } = await query;
@@ -1657,7 +1683,7 @@ const RelatoriosDiarios = () => {
         
         // Se não for admin, filtrar apenas os links do usuário
         if (userType !== 'admin') {
-          query = query.eq('user_id', Number(userId)); // Converter o ID para número
+          query = query.eq('user_id', userId); // Agora é uma string UUID
         }
         
         const { data, error } = await query;
@@ -1802,11 +1828,13 @@ const RelatoriosDiarios = () => {
                   <div className="relatorio-stat">
                     <span className="stat-label">Contribuição para o Grupo:</span>
                     <span className="stat-value" style={{ 
-                      color: getColorByPerformance(
-                        relatorio.entradas_totais > 0 
-                          ? ((relatorio.entradas_link / relatorio.entradas_totais) * 100) 
-                          : 0
-                      ) 
+                      color: relatorio.entradas_totais > 0 
+                        ? getColorByPerformance(
+                          relatorio.entradas_totais > 0 
+                            ? ((relatorio.entradas_link / relatorio.entradas_totais) * 100) 
+                            : 0
+                        ) 
+                        : '#757575'
                     }}>
                       {relatorio.entradas_link > 0 && relatorio.entradas_totais > 0
                         ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%`
@@ -2334,54 +2362,213 @@ const RelatoriosDiarios = () => {
 
 // Componente Principal
 const App = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
+  const [authenticated, setAuthenticated] = useState(false);
+  
+  // Verificar autenticação no IndexedDB ao iniciar
   useEffect(() => {
-    // Verificar se o usuário já está autenticado
     const checkAuth = async () => {
       try {
-        // Verificar se há uma sessão ativa no Supabase
-        const { data: { session } } = await supabase.auth.getSession();
+        // Inicializar o IndexedDB
+        await initDB();
         
-        if (session) {
-          console.log("Sessão encontrada:", session);
-          setIsAuthenticated(true);
-          return;
+        // Verificar se há dados de usuário no IndexedDB
+        const userData = await getUserData();
+        if (userData && userData.uu_id) {
+          setAuthenticated(true);
+          
+          // Atualizar localStorage para compatibilidade com código existente
+          localStorage.setItem('dashboardAuthenticated', 'true');
+          localStorage.setItem('userType', userData.tipo);
+          localStorage.setItem('userId', userData.uu_id);
         }
-        
-        // Se não houver sessão, verificar localStorage como fallback
-        const authenticated = localStorage.getItem('dashboardAuthenticated') === 'true';
-        setIsAuthenticated(authenticated);
       } catch (error) {
-        console.error("Erro ao verificar autenticação:", error);
-        // Fallback para localStorage
-        const authenticated = localStorage.getItem('dashboardAuthenticated') === 'true';
-        setIsAuthenticated(authenticated);
+        console.error('Erro ao verificar autenticação:', error);
       }
     };
     
     checkAuth();
   }, []);
-
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState('');
+  const [modalData, setModalData] = useState(null);
+  const [currentTab, setCurrentTab] = useState('links');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLink, setSelectedLink] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [userModalData, setUserModalData] = useState(null);
+  
   const handleLogin = (user) => {
-    setIsAuthenticated(true);
+    setAuthenticated(true);
+  };
+  
+  const handleLogout = async () => {
+    // Limpar dados do IndexedDB
+    await clearUserData();
+    
+    // Limpar localStorage
+    localStorage.removeItem('dashboardAuthenticated');
+    localStorage.removeItem('dashboardUser');
+    localStorage.removeItem('userType');
+    localStorage.removeItem('userId');
+    
+    setAuthenticated(false);
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Converter o email para minúsculas para evitar problemas de case sensitivity
+      const emailLowerCase = email.toLowerCase();
+      
+      console.log("Tentando fazer login com:", emailLowerCase, password);
+      
+      // Autenticação via webhook n8n
+      const response = await fetch(N8N_LOGIN_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: emailLowerCase,
+          senha: password,
+        }),
+      });
+      
+      // Verificar o status da resposta
+      if (response.status === 401) {
+        throw new Error('Credenciais inválidas');
+      }
+      
+      if (!response.ok) {
+        throw new Error('Erro ao fazer login. Tente novamente.');
+      }
+      
+      const responseData = await response.json();
+      console.log("Resposta do webhook:", responseData);
+      
+      // A resposta pode ser um objeto direto ou um array com um objeto
+      let data;
+      
+      if (Array.isArray(responseData)) {
+        if (responseData.length === 0) {
+          throw new Error('Resposta vazia do servidor');
+        }
+        data = responseData[0];
+      } else {
+        // Se for um objeto direto
+        data = responseData;
+      }
+      
+      console.log("Dados processados:", data);
+      
+      // Verificar se temos o uu_id na resposta
+      if (!data.uu_id) {
+        if (data.login === "incorreto") {
+          throw new Error('Credenciais inválidas');
+        }
+        throw new Error('ID de usuário não encontrado na resposta');
+      }
+      
+      // Buscar informações adicionais do usuário no Supabase
+      const { data: userData, error: userError } = await supabase
+        .from('bravobet_users')
+        .select('*')
+        .eq('uu_id', data.uu_id)
+        .single();
+      
+      if (userError) {
+        console.error('Erro ao buscar dados do usuário:', userError);
+        throw new Error('Erro ao buscar dados do usuário');
+      }
+      
+      // Preparar dados para armazenar no localStorage e IndexedDB
+      const userDataToStore = {
+        uu_id: data.uu_id,
+        email: emailLowerCase,
+        tipo: userData.tipo || 'user',
+        nome: userData.nome || ''
+      };
+      
+      // Salvar no IndexedDB
+      await saveUserData(userDataToStore);
+      
+      // Também salvar no localStorage para compatibilidade com o código existente
+      localStorage.setItem('dashboardAuthenticated', 'true');
+      localStorage.setItem('userType', userDataToStore.tipo); // 'admin' ou 'user'
+      localStorage.setItem('userId', userDataToStore.uu_id); // Agora usamos uu_id em vez de id
+      
+      console.log('Login bem-sucedido:');
+      console.log('- UUID do usuário:', userDataToStore.uu_id);
+      console.log('- Tipo do usuário:', userDataToStore.tipo);
+      
+      handleLogin(userDataToStore);
+    } catch (error) {
+      console.error('Erro ao fazer login:', error.message);
+      setError('Credenciais inválidas ou usuário não autorizado. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleLogout = () => {
-    // Fazer logout no Supabase
-    supabase.auth.signOut().then(() => {
-      // Limpar localStorage
-      localStorage.removeItem('dashboardAuthenticated');
-      localStorage.removeItem('dashboardUser');
-      setIsAuthenticated(false);
-    }).catch(error => {
-      console.error("Erro ao fazer logout:", error);
-    });
-  };
-
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLogin} />;
+  if (!authenticated) {
+    return (
+      <div className="login-container">
+        <div className="login-logo">
+          <h1 style={{ color: '#142c8e', fontSize: '28px', fontWeight: '600' }}>BravoBet</h1>
+        </div>
+        <div className="login-form-container">
+          <form onSubmit={handleSubmit} className="login-form">
+            {error && <div className="error-message">{error}</div>}
+            
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Digite seu email"
+                required
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="password">Senha</label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Digite sua senha"
+                required
+              />
+            </div>
+            
+            <button 
+              type="submit" 
+              className="login-button" 
+              disabled={loading}
+            >
+              {loading ? 'Entrando...' : 'Entrar'}
+            </button>
+            
+            <div className="signup-link">
+              Novo por aqui? <a href="/cadastro-usuarios">Cadastre-se</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -2389,29 +2576,38 @@ const App = () => {
       <nav className="nav">
         <div className="nav-container">
           <button
-            className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            className={`nav-button ${currentTab === 'links' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('links')}
           >
             Dashboard
           </button>
           <button
-            className={`nav-button ${activeTab === 'estatisticas' ? 'active' : ''}`}
-            onClick={() => setActiveTab('estatisticas')}
+            className={`nav-button ${currentTab === 'estatisticas' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('estatisticas')}
           >
             Estatísticas Gerais
           </button>
           <button
-            className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`}
-            onClick={() => setActiveTab('relatorios')}
+            className={`nav-button ${currentTab === 'relatorios' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('relatorios')}
           >
             Relatórios Diários
           </button>
           <button
-            className={`nav-button ${activeTab === 'cadastro' ? 'active' : ''}`}
-            onClick={() => setActiveTab('cadastro')}
+            className={`nav-button ${currentTab === 'cadastro' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('cadastro')}
           >
             Novo Cadastro
           </button>
+          {localStorage.getItem('userType') === 'admin' && (
+            <a 
+              href="/cadastro-usuarios" 
+              className="nav-button"
+              style={{ textDecoration: 'none' }}
+            >
+              Cadastrar Usuários
+            </a>
+          )}
           <button
             className="nav-button"
             onClick={handleLogout}
@@ -2423,14 +2619,14 @@ const App = () => {
       </nav>
 
       <main style={{ padding: '20px 0' }}>
-        {activeTab === 'dashboard' ? (
+        {currentTab === 'links' ? (
           <Dashboard />
-        ) : activeTab === 'estatisticas' ? (
+        ) : currentTab === 'estatisticas' ? (
           <EstatisticasGerais />
-        ) : activeTab === 'relatorios' ? (
+        ) : currentTab === 'relatorios' ? (
           <RelatoriosDiarios />
         ) : (
-          <CadastroForm onCadastroSuccess={() => setActiveTab('dashboard')} />
+          <CadastroForm onCadastroSuccess={() => setCurrentTab('links')} />
         )}
       </main>
     </div>
