@@ -12,6 +12,7 @@ const supabase = createClient(
 
 // URLs dos webhooks n8n
 const N8N_CADASTRO_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/cadastro_trackeador';
+// eslint-disable-next-line no-unused-vars
 const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
 
 const UserRegistration = () => {
@@ -111,6 +112,7 @@ const UserRegistration = () => {
       }
       
       // Buscar informações adicionais do usuário no Supabase para confirmar o cadastro
+      // eslint-disable-next-line no-unused-vars
       const { data: userData, error: userError } = await supabase
         .from('bravobet_users')
         .select('*')

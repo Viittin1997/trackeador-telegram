@@ -12,10 +12,12 @@ const supabase = createClient(
 );
 
 // URLs dos webhooks n8n
+// eslint-disable-next-line no-unused-vars
 const N8N_CADASTRO_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/cadastro_trackeador';
 const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
 
 // Componente de Login
+// eslint-disable-next-line no-unused-vars
 const LoginScreen = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -2399,6 +2401,7 @@ const App = () => {
   const [modalType, setModalType] = useState('');
   // eslint-disable-next-line no-unused-vars
   const [modalData, setModalData] = useState({});
+  // eslint-disable-next-line no-unused-vars
   const [linkData, setLinkData] = useState([]);
   // eslint-disable-next-line no-unused-vars
   const [isMenuOpen, setIsMenuOpen] = useState(false);
