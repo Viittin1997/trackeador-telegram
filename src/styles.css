@@ -379,68 +379,216 @@ input:checked + .toggle-slider:before {
 }
 
 .login-container {
-  background-color: var(--bg-card);
-  border-radius: 0.5rem;
-  padding: 2rem;
-  width: 90%;
-  max-width: 400px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+  padding: 20px;
+}
+
+.login-form-container {
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 380px;
+  padding: 40px 30px;
+  margin-top: 20px;
+}
+
+.login-logo {
+  margin-bottom: 30px;
   text-align: center;
 }
 
-.login-title {
-  margin: 0 0 1.5rem;
-  color: var(--text-primary);
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.login-subtitle {
-  margin: 0 0 2rem;
-  color: var(--text-secondary);
-  font-size: 0.875rem;
+.login-logo img {
+  max-width: 180px;
+  height: auto;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 24px;
 }
 
-.login-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 0.375rem;
-  font-size: 1rem;
-  transition: border-color 0.2s;
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
 }
 
-.login-input:focus {
+.form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #2c2e2f;
+  margin-bottom: 8px;
+}
+
+.form-group input {
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s;
+  background-color: #ffffff;
+}
+
+.form-group input:focus {
+  border-color: #0070ba;
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 2px rgba(0, 112, 186, 0.2);
+}
+
+.forgot-password {
+  text-align: right;
+  margin-top: -16px;
+  margin-bottom: 24px;
+}
+
+.forgot-password a {
+  color: #0070ba;
+  font-size: 14px;
+  text-decoration: none;
 }
 
 .login-button {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 0.375rem;
-  background-color: var(--primary-color);
+  background-color: #142c8e;
   color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 14px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.3s;
+  width: 100%;
+  margin-top: 16px;
 }
 
 .login-button:hover {
-  background-color: var(--primary-hover);
+  background-color: #0a1e64;
 }
 
-.login-error {
-  color: var(--danger-color);
-  font-size: 0.875rem;
-  margin-top: 1rem;
+.login-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.signup-link {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 14px;
+  color: #2c2e2f;
+}
+
+.signup-link a {
+  color: #0070ba;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #d32f2f;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+/* Estilos para a página de cadastro (inspirado no PayPal) */
+.user-registration-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+  padding: 20px;
+}
+
+.user-registration-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 20px;
+}
+
+.user-registration-header h2 {
+  font-size: 22px;
+  color: #2c2e2f;
+  font-weight: 500;
+}
+
+.back-button {
+  color: #2c2e2f;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.back-button svg {
+  margin-right: 6px;
+}
+
+.user-registration-form-container {
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 380px;
+  padding: 30px;
+}
+
+.user-registration-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.register-button {
+  background-color: #142c8e;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.register-button:hover {
+  background-color: #0a1e64;
+}
+
+.register-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.success-message {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.terms-text {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 16px;
+  text-align: center;
 }
 
 /* Dashboard */

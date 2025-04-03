@@ -1,0 +1,151 @@
+.user-registration-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Roboto', sans-serif;
+  background-color: #ffffff;
+  min-height: 100vh;
+}
+
+.user-registration-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.user-registration-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.user-registration-form-container {
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  padding: 40px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.user-registration-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 15px;
+}
+
+.form-group input,
+.form-group select {
+  padding: 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s;
+  background-color: #f9f9f9;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #3498db;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+  outline: none;
+}
+
+.button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.3s;
+  box-shadow: 0 4px 6px rgba(52, 152, 219, 0.1);
+}
+
+.button:hover {
+  background-color: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(52, 152, 219, 0.2);
+}
+
+.button:active {
+  transform: translateY(0);
+}
+
+.button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.button.secondary {
+  background-color: #2ecc71;
+  box-shadow: 0 4px 6px rgba(46, 204, 113, 0.1);
+}
+
+.button.secondary:hover {
+  background-color: #27ae60;
+  box-shadow: 0 6px 8px rgba(46, 204, 113, 0.2);
+}
+
+.error-message {
+  background-color: #fff5f5;
+  color: #e74c3c;
+  padding: 14px;
+  border-radius: 8px;
+  border-left: 4px solid #e74c3c;
+  margin-bottom: 10px;
+}
+
+.success-message {
+  background-color: #f0fff4;
+  color: #2ecc71;
+  padding: 14px;
+  border-radius: 8px;
+  border-left: 4px solid #2ecc71;
+  margin-bottom: 10px;
+}
+
+.access-denied {
+  text-align: center;
+  padding: 60px;
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  max-width: 600px;
+  margin: 60px auto;
+}
+
+.access-denied h2 {
+  color: #e74c3c;
+  margin-bottom: 20px;
+  font-size: 28px;
+}
+
+.access-denied p {
+  margin-bottom: 30px;
+  color: #7f8c8d;
+  font-size: 18px;
+}
