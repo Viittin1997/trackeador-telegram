@@ -1,4 +1,5 @@
-# Trackeador Telegram - BravoBet
+# TrackPro
+### Dados precisos, decisões inteligentes
 
 Aplicação para rastreamento de links do Telegram com autenticação, controle de acesso baseado em perfis de usuário e dashboard.
 

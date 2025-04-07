@@ -81,7 +81,8 @@ const LoginScreen = ({ onLogin }) => {
   return (
     <div className="login-container">
       <div className="login-logo">
-        <h1 style={{ color: '#142c8e', fontSize: '28px', fontWeight: '600' }}>BravoBet</h1>
+        <img src="/logotipo-branco.png" alt="TrackPro" style={{ maxWidth: '250px', marginBottom: '15px' }} />
+        <p style={{ color: '#555', fontSize: '16px', marginTop: '5px' }}>Dados precisos, decisões inteligentes</p>
       </div>
       <div className="login-form-container">
         <form onSubmit={handleSubmit} className="login-form">
@@ -2539,7 +2540,8 @@ const App = () => {
     return (
       <div className="login-container">
         <div className="login-logo">
-          <h1 style={{ color: '#142c8e', fontSize: '28px', fontWeight: '600' }}>BravoBet</h1>
+          <img src="/logotipo-branco.png" alt="TrackPro" style={{ maxWidth: '250px', marginBottom: '15px' }} />
+          <p style={{ color: '#555', fontSize: '16px', marginTop: '5px' }}>Dados precisos, decisões inteligentes</p>
         </div>
         <div className="login-form-container">
           <form onSubmit={handleSubmit} className="login-form">
