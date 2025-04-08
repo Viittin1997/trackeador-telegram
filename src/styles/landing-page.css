@@ -75,12 +75,22 @@ body {
 
 .landing-header .logo {
   display: flex;
-  justify-content: center;
+  align-items: center;
 }
 
+.landing-header .header-logo,
 .landing-header .logo img {
-  max-width: 100px;
-  height: auto;
+  height: 60px;
+  width: auto;
+  filter: brightness(0) invert(1);
+  max-width: 200px;
+}
+
+@media (max-width: 767px) {
+  .landing-header .header-logo,
+  .landing-header .logo img {
+    height: 45px;
+  }
 }
 
 .landing-header .nav-links {
@@ -237,12 +247,12 @@ body {
   display: flex;
   align-items: center;
   font-size: 0.8rem;
-  color: var(--text-light);
+  color: #000000;
 }
 
 .cta-note i {
-  color: var(--success-color);
-  margin-right: 6px;
+  color: #4CAF50;
+  margin-right: 5px;
 }
 
 .dashboard-preview {
@@ -926,6 +936,77 @@ body {
   font-size: 1.1rem;
   margin-bottom: 30px;
   opacity: 0.9;
+}
+
+.cta-form-container {
+  max-width: 600px;
+  margin: 0 auto;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 30px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+}
+
+.cta-form-container h3 {
+  font-size: 1.6rem;
+  margin-bottom: 20px;
+  color: white;
+}
+
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px 15px;
+  border-radius: 6px;
+  border: none;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.cta-note {
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+  color: #ffffff;
+  opacity: 1;
+}
+
+.cta-benefits {
+  margin-top: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.benefit-item i {
+  color: var(--accent-color);
+  font-size: 1.1rem;
+}
+
+.benefit-item span {
+  font-size: 0.95rem;
+  color: #ffffff;
 }
 
 .cta-buttons {
@@ -1704,4 +1785,120 @@ body {
 
 .mobile-menu-item:hover {
   color: var(--accent-color);
+}
+
+/* Adicionar estilos responsivos para o formulário na seção CTA */
+@media (max-width: 767px) {
+  .cta-form-container {
+    padding: 20px;
+    max-width: 90%;
+  }
+  
+  .cta-form-container h3 {
+    font-size: 1.4rem;
+  }
+  
+  .form-control {
+    padding: 10px;
+  }
+  
+  .cta-benefits {
+    margin-top: 20px;
+  }
+  
+  .cta-button.large {
+    width: 100%;
+    padding: 12px 15px;
+  }
+}
+
+@media (max-width: 576px) {
+  .cta-form-container {
+    padding: 15px;
+    max-width: 95%;
+  }
+  
+  .form-group {
+    margin-bottom: 10px;
+  }
+  
+  .cta-benefits {
+    gap: 8px;
+  }
+  
+  .benefit-item span {
+    font-size: 0.85rem;
+  }
+}
+
+/* Start Free Section */
+.start-free-section {
+  background-color: var(--primary-color);
+  padding: 30px 0;
+}
+
+.start-free-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 15px;
+}
+
+.gift-icon {
+  font-size: 2rem;
+  color: white;
+  margin-right: 15px;
+}
+
+.start-free-text {
+  flex-grow: 1;
+}
+
+.start-free-text h3 {
+  font-size: 1.5rem;
+  margin-bottom: 5px;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.start-free-text p {
+  font-size: 1rem;
+  color: #ffffff;
+  opacity: 1;
+  margin: 0;
+}
+
+.start-free-button .cta-button {
+  background-color: var(--accent-color);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.start-free-button .cta-button:hover {
+  background-color: #ff6a00;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 767px) {
+  .start-free-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 15px;
+  }
+  
+  .gift-icon {
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+  
+  .start-free-text {
+    margin-bottom: 15px;
+  }
 }

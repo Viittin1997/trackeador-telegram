@@ -86,7 +86,7 @@ const LandingPage = () => {
       <header className="landing-header">
         <div className="container">
           <div className="logo mobile-hide">
-            <img src="/logotipo-branco.png" alt="TrackPro" />
+            <img src="/logotipo-branco.png" alt="TrackPro" className="header-logo" />
           </div>
           <div className="nav-links">
             <Link to="/" className="nav-link">Entrar</Link>
@@ -119,8 +119,8 @@ const LandingPage = () => {
             </div>
             <div className="hero-cta">
               <Link to="/cadastro-usuarios" className="cta-button large">Teste Gratuito <i className="fas fa-arrow-right"></i></Link>
-              <div className="cta-note">
-                <i className="fas fa-check-circle"></i> Sem necessidade de cartão de crédito para testar
+              <div className="cta-note" style={{ color: '#000000' }}>
+                <i className="fas fa-check-circle" style={{ color: '#4CAF50' }}></i> Sem necessidade de cartão de crédito para testar
               </div>
             </div>
           </div>
@@ -133,7 +133,24 @@ const LandingPage = () => {
         </div>
       </section>
 
-      <section className="features-section">
+      <section className="start-free-section">
+        <div className="container">
+          <div className="start-free-content">
+            <div className="gift-icon">
+              <i className="fas fa-gift" style={{ color: '#ffffff' }}></i>
+            </div>
+            <div className="start-free-text">
+              <h3 style={{ color: '#ffffff' }}>Comece Grátis</h3>
+              <p style={{ color: '#ffffff' }}>Experimente nosso sistema por 10 dias sem compromisso</p>
+            </div>
+            <div className="start-free-button">
+              <Link to="/cadastro-usuarios" className="cta-button">Iniciar Teste</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="features-section" id="features">
         <div className="container">
           <div className="section-header">
             <h2>Ferramentas que Impulsionam suas Vendas</h2>
@@ -266,8 +283,8 @@ const LandingPage = () => {
           
           <div className="free-trial-banner">
             <div className="free-trial-content">
-              <h3><i className="fas fa-gift"></i> Comece Grátis</h3>
-              <p>Experimente nosso sistema por 10 dias sem compromisso</p>
+              <h3 style={{ color: '#ffffff' }}><i className="fas fa-gift" style={{ color: '#ffffff' }}></i> Comece Grátis</h3>
+              <p style={{ color: '#ffffff' }}>Experimente nosso sistema por 10 dias sem compromisso</p>
             </div>
             <div className="button-container">
               <Link to="/cadastro-usuarios" className="cta-button accent">Iniciar Teste</Link>
@@ -456,10 +473,10 @@ const LandingPage = () => {
           <h2>Pronto para transformar seus dados em resultados?</h2>
           <p>Comece a usar o TrackPro hoje mesmo e leve suas campanhas no Telegram para o próximo nível.</p>
           
-          <div className="cta-split">
-            <div className="cta-form">
-              <h3>Comece seu teste gratuito agora</h3>
-              <form className="signup-form" action="/cadastro-usuarios" method="get">
+          <div className="cta-form-container">
+            <h3>Comece seu teste gratuito agora</h3>
+            <form className="signup-form" action="/cadastro-usuarios" method="get">
+              <div className="form-group">
                 <input 
                   type="email" 
                   name="email" 
@@ -467,24 +484,28 @@ const LandingPage = () => {
                   value={emailValue}
                   onChange={(e) => setEmailValue(e.target.value)}
                   required 
+                  className="form-control"
                 />
+              </div>
+              <div className="form-group">
                 <input 
                   type="tel" 
                   name="whatsapp" 
                   placeholder="Seu WhatsApp com DDD" 
                   value={whatsappValue}
                   onChange={handleWhatsappChange}
-                  maxLength={16} // (XX) XXXXX-XXXX tem 16 caracteres
+                  maxLength={16}
                   required 
+                  className="form-control"
                 />
-                <div className="button-container">
-                  <button type="submit" className="cta-button large accent">
-                    Começar Teste <i className="fas fa-arrow-right"></i>
-                  </button>
-                </div>
-              </form>
-              <p className="cta-subtext">Não é necessário cartão de crédito • Teste gratuito por 10 dias</p>
-            </div>
+              </div>
+              <div className="form-group">
+                <button type="submit" className="cta-button large accent">
+                  Começar Teste <i className="fas fa-arrow-right"></i>
+                </button>
+              </div>
+            </form>
+            <p className="cta-note">Não é necessário cartão de crédito • Teste gratuito por 10 dias</p>
             
             <div className="cta-benefits">
               <div className="benefit-item">
