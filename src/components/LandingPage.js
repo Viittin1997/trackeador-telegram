@@ -85,12 +85,12 @@ const LandingPage = () => {
     <div className="landing-page">
       <header className="landing-header">
         <div className="container">
-          <div className="logo">
+          <div className="logo mobile-hide">
             <img src="/logotipo-branco.png" alt="TrackPro" />
           </div>
           <div className="nav-links">
             <Link to="/" className="nav-link">Entrar</Link>
-            <Link to="/cadastro-usuarios" className="cta-button">Começar Grátis</Link>
+            <Link to="/cadastro-usuarios" className="cta-button">Começar</Link>
           </div>
         </div>
       </header>
@@ -98,9 +98,11 @@ const LandingPage = () => {
       <section className="hero-section">
         <div className="container">
           <div className="hero-content">
-            <h1>Aumente suas Conversões no Telegram em até 55%</h1>
-            <h2>A plataforma que rastreia entradas no seu canal do Telegram</h2>
-            <p>Chega de campanhas sem rastreamento e resultados imprevisíveis. Tenha controle total sobre suas campanhas no Telegram.</p>
+            <div className="hero-text">
+              <h1>Aumente suas Conversões no Telegram em até 55%</h1>
+              <h2>A plataforma que rastreia entradas no seu canal do Telegram</h2>
+              <p>Chega de campanhas sem rastreamento e resultados imprevisíveis. Tenha controle total sobre suas campanhas no Telegram.</p>
+            </div>
             <div className="hero-stats">
               <div className="stat-item">
                 <span className="stat-number">99.9%</span>
@@ -115,10 +117,12 @@ const LandingPage = () => {
                 <span className="stat-label">Entradas em canais rastreados/mês</span>
               </div>
             </div>
-            <Link to="/cadastro-usuarios" className="cta-button large accent">
-              Começar Teste Gratuito de 10 Dias <i className="fas fa-arrow-right"></i>
-            </Link>
-            <p className="no-card-required">Sem necessidade de cartão de crédito para testar</p>
+            <div className="hero-cta">
+              <Link to="/cadastro-usuarios" className="cta-button large">Teste Gratuito <i className="fas fa-arrow-right"></i></Link>
+              <div className="cta-note">
+                <i className="fas fa-check-circle"></i> Sem necessidade de cartão de crédito para testar
+              </div>
+            </div>
           </div>
           <div className="hero-image">
             <div className="dashboard-preview">
@@ -265,7 +269,9 @@ const LandingPage = () => {
               <h3><i className="fas fa-gift"></i> Comece Grátis</h3>
               <p>Experimente nosso sistema por 10 dias sem compromisso</p>
             </div>
-            <Link to="/cadastro-usuarios" className="cta-button accent">Iniciar Teste Gratuito</Link>
+            <div className="button-container">
+              <Link to="/cadastro-usuarios" className="cta-button accent">Iniciar Teste</Link>
+            </div>
           </div>
           
           <div className="pricing-grid">
@@ -288,7 +294,9 @@ const LandingPage = () => {
                 </ul>
               </div>
               <div className="pricing-footer">
-                <Link to="/cadastro-usuarios" className="pricing-button">Começar Teste de 10 Dias</Link>
+                <div className="button-container">
+                  <Link to="/cadastro-usuarios" className="pricing-button">Começar Teste</Link>
+                </div>
               </div>
             </div>
             
@@ -314,7 +322,9 @@ const LandingPage = () => {
                 </ul>
               </div>
               <div className="pricing-footer">
-                <Link to="/cadastro-usuarios" className="pricing-button featured">Começar Teste de 10 Dias</Link>
+                <div className="button-container">
+                  <Link to="/cadastro-usuarios" className="pricing-button featured">Começar Teste</Link>
+                </div>
                 <div className="guarantee">
                   <i className="fas fa-shield-alt"></i> Garantia de 30 dias ou seu dinheiro de volta
                 </div>
@@ -340,7 +350,9 @@ const LandingPage = () => {
                 </ul>
               </div>
               <div className="pricing-footer">
-                <Link to="/cadastro-usuarios" className="pricing-button">Começar Teste de 10 Dias</Link>
+                <div className="button-container">
+                  <Link to="/cadastro-usuarios" className="pricing-button">Começar Teste</Link>
+                </div>
               </div>
             </div>
           </div>
@@ -465,9 +477,11 @@ const LandingPage = () => {
                   maxLength={16} // (XX) XXXXX-XXXX tem 16 caracteres
                   required 
                 />
-                <button type="submit" className="cta-button large accent">
-                  Começar Gratuitamente <i className="fas fa-arrow-right"></i>
-                </button>
+                <div className="button-container">
+                  <button type="submit" className="cta-button large accent">
+                    Começar Teste <i className="fas fa-arrow-right"></i>
+                  </button>
+                </div>
               </form>
               <p className="cta-subtext">Não é necessário cartão de crédito • Teste gratuito por 10 dias</p>
             </div>
