@@ -85,9 +85,12 @@ const LandingPage = () => {
     <div className="landing-page">
       <header className="landing-header">
         <div className="container">
-          <img src="/logotipo-branco.png" alt="TrackPro" className="landing-logo" />
-          <div className="header-cta">
-            <Link to="/" className="cta-button">Acessar Plataforma</Link>
+          <div className="logo">
+            <img src="/logotipo-branco.png" alt="TrackPro" />
+          </div>
+          <div className="nav-links">
+            <Link to="/" className="nav-link">Entrar</Link>
+            <Link to="/cadastro-usuarios" className="cta-button">Começar Grátis</Link>
           </div>
         </div>
       </header>
