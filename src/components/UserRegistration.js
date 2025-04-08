@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/UserRegistration.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { saveUserData } from '../utils/indexedDBUtil';
 import { createClient } from '@supabase/supabase-js';
 
@@ -21,9 +21,51 @@ const UserRegistration = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nome, setNome] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Função para formatar o WhatsApp
+  const formatWhatsapp = (value) => {
+    // Remove todos os caracteres não numéricos
+    const numericValue = value.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos (DDD + 9 dígitos)
+    const limitedValue = numericValue.slice(0, 11);
+    
+    // Formata como (XX) XXXXX-XXXX
+    if (limitedValue.length <= 2) {
+      return limitedValue;
+    } else if (limitedValue.length <= 7) {
+      return `(${limitedValue.slice(0, 2)}) ${limitedValue.slice(2)}`;
+    } else {
+      return `(${limitedValue.slice(0, 2)}) ${limitedValue.slice(2, 7)}-${limitedValue.slice(7)}`;
+    }
+  };
+
+  // Handler para o campo de WhatsApp
+  const handleWhatsappChange = (e) => {
+    const formattedValue = formatWhatsapp(e.target.value);
+    setWhatsapp(formattedValue);
+  };
+
+  // Capturar o parâmetro de email da URL quando o componente é montado
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const emailParam = params.get('email');
+    const whatsappParam = params.get('whatsapp');
+    
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+    
+    if (whatsappParam) {
+      // Formatar o WhatsApp recebido da URL
+      setWhatsapp(formatWhatsapp(whatsappParam));
+    }
+  }, [location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,13 +75,20 @@ const UserRegistration = () => {
     setSuccess('');
     
     // Validações básicas
-    if (!email || !password || !confirmPassword || !nome) {
+    if (!email || !password || !confirmPassword || !nome || !whatsapp) {
       setError('Por favor, preencha todos os campos.');
       return;
     }
     
     if (password !== confirmPassword) {
       setError('As senhas não coincidem.');
+      return;
+    }
+    
+    // Validar formato do WhatsApp (deve ter pelo menos DDD + 8 dígitos)
+    const whatsappNumerico = whatsapp.replace(/\D/g, '');
+    if (whatsappNumerico.length < 10) {
+      setError('Número de WhatsApp inválido. Informe DDD + número.');
       return;
     }
     
@@ -56,6 +105,7 @@ const UserRegistration = () => {
           email: email.toLowerCase(),
           senha: password, // Alterado para 'senha' conforme nova estrutura
           nome: nome,
+          whatsapp: whatsappNumerico, // Enviar apenas os números, sem formatação
           tipo: 'user' // Tipo sempre será "user" para novos cadastros
         }),
       });
@@ -129,7 +179,8 @@ const UserRegistration = () => {
         uu_id: data.uu_id,
         email: email.toLowerCase(),
         tipo: 'user',
-        nome: nome
+        nome: nome,
+        whatsapp: whatsapp
       };
       
       await saveUserData(userDataToStore);
@@ -147,6 +198,7 @@ const UserRegistration = () => {
       setPassword('');
       setConfirmPassword('');
       setNome('');
+      setWhatsapp('');
       
       // Redirecionar para o dashboard após cadastro bem-sucedido
       setTimeout(() => {
@@ -203,13 +255,26 @@ const UserRegistration = () => {
           </div>
           
           <div className="form-group">
+            <label htmlFor="whatsapp">WhatsApp</label>
+            <input
+              type="tel"
+              id="whatsapp"
+              value={whatsapp}
+              onChange={handleWhatsappChange}
+              placeholder="Digite seu número com DDD"
+              maxLength={16} // (XX) XXXXX-XXXX tem 16 caracteres
+              required
+            />
+          </div>
+          
+          <div className="form-group">
             <label htmlFor="password">Senha</label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Crie uma senha"
+              placeholder="Digite sua senha"
               required
             />
           </div>
@@ -221,21 +286,21 @@ const UserRegistration = () => {
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Digite a senha novamente"
+              placeholder="Confirme sua senha"
               required
             />
           </div>
           
           <button 
             type="submit" 
-            className="register-button" 
+            className="button"
             disabled={loading}
           >
-            {loading ? 'Cadastrando...' : 'Criar Conta'}
+            {loading ? 'Cadastrando...' : 'Cadastrar'}
           </button>
           
-          <div className="terms-text">
-            Ao clicar no botão acima, você concorda com os Termos de Serviço e Política de Privacidade da BravoBet.
+          <div className="login-link">
+            Já tem uma conta? <a href="/">Faça login</a>
           </div>
         </form>
       </div>

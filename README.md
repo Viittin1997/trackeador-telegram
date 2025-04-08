@@ -23,10 +23,10 @@ Aplicação para rastreamento de links do Telegram com autenticação, controle 
 
 ## Estrutura do Banco de Dados
 
-- `bravobet_users`: Armazena informações dos usuários (email, tipo: admin/user)
-- `bravobet_links_personalizados`: Links rastreados com associação a usuários específicos
-- `bravobet_leads_telegram`: Registro de leads capturados através dos links
-- `bravobet_registro_de_entrada`: Dados detalhados sobre entradas de usuários
+- `trackpro_users`: Armazena informações dos usuários (email, tipo: admin/user)
+- `trackpro_links_personalizados`: Links rastreados com associação a usuários específicos
+- `trackpro_leads_telegram`: Registro de leads capturados através dos links
+- `trackpro_registro_de_entrada`: Dados detalhados sobre entradas de usuários
 
 ## Como Executar Localmente
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 // eslint-disable-next-line
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './styles.css';
 import { initDB, saveUserData, getUserData, clearUserData } from './utils/indexedDBUtil';
 
@@ -777,13 +777,14 @@ const Dashboard = ({ setCurrentTab, currentTab }) => {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h2>Dashboard de Links</h2>
-        <button onClick={fetchLinks} className="button button-update button-small">
+        <button onClick={fetchLinks} className="button button-update">
           Atualizar Dados
         </button>
       </div>
 
       {/* Barra de busca */}
       <div className="search-container">
+        <i className="fas fa-search search-icon"></i>
         <input
           type="text"
           placeholder="Buscar por nome do link ou apelido do expert..."
@@ -903,134 +904,135 @@ const Dashboard = ({ setCurrentTab, currentTab }) => {
           )}
         </>
       )}
-      
-      {/* Modal de Edição */}
-      <Modal 
-        isOpen={editingLink !== null} 
-        onClose={() => setEditingLink(null)}
-        title="Editar Link"
-      >
-        {editingLink && (
-          <LinkForm 
-            initialData={editingLink} 
-            onSubmit={handleUpdate} 
-            buttonText="Atualizar"
-          />
-        )}
-      </Modal>
+        
+        {/* Modal de Edição */}
+        <Modal 
+          isOpen={editingLink !== null} 
+          onClose={() => setEditingLink(null)}
+          title="Editar Link"
+        >
+          {editingLink && (
+            <LinkForm 
+              initialData={editingLink} 
+              onSubmit={handleUpdate} 
+              buttonText="Atualizar"
+            />
+          )}
+        </Modal>
 
-      {/* Modal de Estatísticas */}
-      <Modal
-        isOpen={statsModalOpen}
-        onClose={() => setStatsModalOpen(false)}
-        title={`Estatísticas: ${selectedLinkStats?.nome_link || ''}`}
-      >
-        {selectedLinkStats && (
-          <div className="stats-modal-content">
-            <div className="stats-section">
-              <h3>Entradas pelo Link vs. Entradas Totais</h3>
-              <div className="stats-info">
-                <p>{calculateStats(selectedLinkStats).entryPercentage}% das entradas totais vieram através deste link</p>
-              </div>
-              <div className="stats-bar-container">
-                <div 
-                  className="stats-bar" 
-                  style={{ 
-                    width: `${calculateStats(selectedLinkStats).entryPercentage}%`, 
-                    backgroundColor: calculateStats(selectedLinkStats).entryColor 
-                  }}
-                >
-                  {calculateStats(selectedLinkStats).entryPercentage > 10
-                    ? `${calculateStats(selectedLinkStats).entryPercentage}%` 
-                    : ''}
+        {/* Modal de Estatísticas */}
+        <Modal
+          isOpen={statsModalOpen}
+          onClose={() => setStatsModalOpen(false)}
+          title={`Estatísticas: ${selectedLinkStats?.nome_link || ''}`}
+        >
+          {selectedLinkStats && (
+            <div className="stats-modal-content">
+              <div className="stats-section">
+                <h3>Entradas pelo Link vs. Entradas Totais</h3>
+                <div className="stats-info">
+                  <p>{calculateStats(selectedLinkStats).entryPercentage}% das entradas totais vieram através deste link</p>
+                </div>
+                <div className="stats-bar-container">
+                  <div 
+                    className="stats-bar" 
+                    style={{ 
+                      width: `${calculateStats(selectedLinkStats).entryPercentage}%`,
+                      backgroundColor: calculateStats(selectedLinkStats).entryColor 
+                    }}
+                  >
+                    {calculateStats(selectedLinkStats).entryPercentage > 10
+                      ? `${calculateStats(selectedLinkStats).entryPercentage}%` 
+                      : ''}
+                  </div>
+                </div>
+                <div className="stats-legend">
+                  <div className="stats-legend-item">
+                    <span className="stats-dot entry-dot"></span>
+                    <span>Entradas pelo link: {selectedLinkStats.quantidade_entrada}</span>
+                  </div>
+                  <div className="stats-legend-item">
+                    <span className="stats-dot total-dot"></span>
+                    <span>Entradas totais: {selectedLinkStats.entrada_total_grupo}</span>
+                  </div>
                 </div>
               </div>
-              <div className="stats-legend">
-                <div className="stats-legend-item">
-                  <span className="stats-dot entry-dot"></span>
-                  <span>Entradas pelo link: {selectedLinkStats.quantidade_entrada}</span>
+
+              <div className="stats-section">
+                <h3>Relação de Saídas</h3>
+                <div className="stats-info">
+                  <p>{calculateStats(selectedLinkStats).exitRatio}% das saídas são de usuários que entraram por este link</p>
                 </div>
-                <div className="stats-legend-item">
-                  <span className="stats-dot total-dot"></span>
-                  <span>Entradas totais: {selectedLinkStats.entrada_total_grupo}</span>
+                <div className="stats-bar-container">
+                  <div 
+                    className="stats-bar exit-bar" 
+                    style={{ 
+                      width: `${calculateStats(selectedLinkStats).exitRatio}%`, 
+                      backgroundColor: calculateStats(selectedLinkStats).exitColor 
+                    }}
+                  >
+                    {calculateStats(selectedLinkStats).exitRatio > 10
+                      ? `${calculateStats(selectedLinkStats).exitRatio}%` 
+                      : ''}
+                  </div>
+                </div>
+                <div className="stats-legend">
+                  <div className="stats-legend-item">
+                    <span className="stats-dot exit-link-dot"></span>
+                    <span>Saídas de usuários que usaram o link: {selectedLinkStats.saidas_que_usaram_link}</span>
+                  </div>
+                  <div className="stats-legend-item">
+                    <span className="stats-dot exit-total-dot"></span>
+                    <span>Saídas totais: {selectedLinkStats.saidas_totais}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="stats-section">
+                <h3>Média de Entradas por Dia</h3>
+                <div className="stats-info">
+                  <p>Em média, {calculateStats(selectedLinkStats).entriesPerDay} pessoas entram por dia através deste link</p>
+                </div>
+                <div className="stats-value">
+                  <span className="stats-number" style={{ color: calculateStats(selectedLinkStats).dailyColor }}>
+                    {calculateStats(selectedLinkStats).entriesPerDay}
+                  </span>
+                  <span className="stats-unit">entradas/dia</span>
+                </div>
+                <div className="stats-date-info">
+                  <p>Link criado em: {selectedLinkStats.created_at ? new Date(selectedLinkStats.created_at).toLocaleDateString('pt-BR') : 'Data desconhecida'}</p>
                 </div>
               </div>
             </div>
+          )}
+        </Modal>
 
-            <div className="stats-section">
-              <h3>Relação de Saídas</h3>
-              <div className="stats-info">
-                <p>{calculateStats(selectedLinkStats).exitRatio}% das saídas são de usuários que entraram por este link</p>
-              </div>
-              <div className="stats-bar-container">
-                <div 
-                  className="stats-bar exit-bar" 
-                  style={{ 
-                    width: `${calculateStats(selectedLinkStats).exitRatio}%`, 
-                    backgroundColor: calculateStats(selectedLinkStats).exitColor 
-                  }}
-                >
-                  {calculateStats(selectedLinkStats).exitRatio > 10
-                    ? `${calculateStats(selectedLinkStats).exitRatio}%` 
-                    : ''}
-                </div>
-              </div>
-              <div className="stats-legend">
-                <div className="stats-legend-item">
-                  <span className="stats-dot exit-link-dot"></span>
-                  <span>Saídas de usuários que usaram o link: {selectedLinkStats.saidas_que_usaram_link}</span>
-                </div>
-                <div className="stats-legend-item">
-                  <span className="stats-dot exit-total-dot"></span>
-                  <span>Saídas totais: {selectedLinkStats.saidas_totais}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="stats-section">
-              <h3>Média de Entradas por Dia</h3>
-              <div className="stats-info">
-                <p>Em média, {calculateStats(selectedLinkStats).entriesPerDay} pessoas entram por dia através deste link</p>
-              </div>
-              <div className="stats-value">
-                <span className="stats-number" style={{ color: calculateStats(selectedLinkStats).dailyColor }}>
-                  {calculateStats(selectedLinkStats).entriesPerDay}
-                </span>
-                <span className="stats-unit">entradas/dia</span>
-              </div>
-              <div className="stats-date-info">
-                <p>Link criado em: {selectedLinkStats.created_at ? new Date(selectedLinkStats.created_at).toLocaleDateString('pt-BR') : 'Data desconhecida'}</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Modal de Confirmação de Exclusão */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirmar Exclusão"
-        footer={
-          <>
-            <button 
-              className="button" 
-              onClick={() => setIsDeleteModalOpen(false)}
-            >
-              Cancelar
-            </button>
-            <button 
-              className="button button-danger" 
-              onClick={handleDelete}
-            >
-              Excluir
-            </button>
-          </>
-        }
-      >
-        <p>Tem certeza que deseja excluir o link "{linkToDelete?.nome_link}"?</p>
-        <p>Esta ação não pode ser desfeita.</p>
-      </Modal>
+        {/* Modal de Confirmação de Exclusão */}
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          title="Confirmar Exclusão"
+          footer={
+            <>
+              <button 
+                className="button" 
+                onClick={() => setIsDeleteModalOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="button button-danger" 
+                onClick={handleDelete}
+              >
+                Excluir
+              </button>
+            </>
+          }
+        >
+          <p>Tem certeza que deseja excluir o link "{linkToDelete?.nome_link}"?</p>
+          <p>Esta ação não pode ser desfeita.</p>
+        </Modal>
+      </div>
     </div>
   );
 };
@@ -1162,11 +1164,11 @@ const EstatisticasGerais = () => {
       }
       
       const { data, error } = await query;
-      
+
       if (error) throw error;
       
       // Buscar contagem de leads para cada link
-      const linksWithLeadCount = await Promise.all(data.map(async (link) => {
+      const linksWithLeadCount = await Promise.all((data || []).map(async (link) => {
         const { count, error: countError } = await supabase
           .from('bravobet_leads_telegram')
           .select('id', { count: 'exact', head: true })
@@ -1209,7 +1211,7 @@ const EstatisticasGerais = () => {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h2>Estatísticas Gerais</h2>
-        <button onClick={fetchLinks} className="button button-update button-small">
+        <button onClick={fetchLinks} className="button button-update">
           Atualizar Dados
         </button>
       </div>
@@ -1876,7 +1878,7 @@ const RelatoriosDiarios = () => {
                       className="stats-bar" 
                       style={{ 
                         width: `${relatorio.entradas_totais > 0 
-                          ? (relatorio.entradas_link / relatorio.entradas_totais) * 100 
+                          ? (relatorio.entradas_link / relatorio.entradas_totais) * 100
                           : 0}%`,
                         backgroundColor: '#34a853'
                       }}
@@ -1893,7 +1895,7 @@ const RelatoriosDiarios = () => {
                       className="stats-bar" 
                       style={{ 
                         width: `${relatorio.entradas_totais > 0 
-                          ? ((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100 
+                          ? ((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100
                           : 0}%`,
                         backgroundColor: '#4285F4'
                       }}
@@ -1928,7 +1930,7 @@ const RelatoriosDiarios = () => {
                       className="stats-bar" 
                       style={{ 
                         width: `${relatorio.saidas_totais > 0 
-                          ? (relatorio.saidas_link / relatorio.saidas_totais) * 100 
+                          ? (relatorio.saidas_link / relatorio.saidas_totais) * 100
                           : 0}%`,
                         backgroundColor: '#FBBC05'
                       }}
@@ -1945,7 +1947,7 @@ const RelatoriosDiarios = () => {
                       className="stats-bar" 
                       style={{ 
                         width: `${relatorio.saidas_totais > 0 
-                          ? ((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100 
+                          ? ((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100
                           : 0}%`,
                         backgroundColor: '#EA4335'
                       }}
@@ -2367,24 +2369,10 @@ const RelatoriosDiarios = () => {
 // Componente Principal
 const App = () => {
   const [authenticated, setAuthenticated] = useState(false);
-  const [currentTab, setCurrentTab] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [userData, setUserData] = useState(null);
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  // Toggle sidebar function
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
+  
   // Verificar autenticação no IndexedDB ao iniciar
   useEffect(() => {
     const checkAuth = async () => {
-      setLoading(true);
       try {
         // Inicializar o IndexedDB
         await initDB();
@@ -2401,14 +2389,40 @@ const App = () => {
         }
       } catch (error) {
         console.error('Erro ao verificar autenticação:', error);
-      } finally {
-        setLoading(false);
       }
     };
     
     checkAuth();
   }, []);
-
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [showModal, setShowModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [modalType, setModalType] = useState('');
+  // eslint-disable-next-line no-unused-vars
+  const [modalData, setModalData] = useState({});
+  // eslint-disable-next-line no-unused-vars
+  const [linkData, setLinkData] = useState([]);
+  // eslint-disable-next-line no-unused-vars
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [searchTerm, setSearchTerm] = useState('');
+  // eslint-disable-next-line no-unused-vars
+  const [selectedLink, setSelectedLink] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [showEditModal, setShowEditModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [showUserModal, setShowUserModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [userModalData, setUserModalData] = useState({});
+  const [currentTab, setCurrentTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
   const handleLogin = (user) => {
     setAuthenticated(true);
   };
@@ -2577,82 +2591,78 @@ const App = () => {
     );
   }
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
   return (
-    <div className="app-container">
-      {/* Botão do menu lateral */}
-      <button className="sidebar-toggle" onClick={toggleSidebar}>
+    <div>
+      {/* Menu lateral para mobile */}
+      <button className="mobile-menu-toggle" onClick={toggleSidebar}>
         <i className="fas fa-bars"></i>
       </button>
       
-      {/* Menu lateral */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <button className="close-sidebar" onClick={toggleSidebar}>
+          <i className="fas fa-times"></i>
+        </button>
         <div className="sidebar-header">
-          <h2>TrackPro</h2>
-          <button className="sidebar-close" onClick={toggleSidebar}>
-            <i className="fas fa-times"></i>
-          </button>
+          <img src="/logotipo-normal.png" alt="TrackPro" className="sidebar-logo" />
         </div>
         <nav className="sidebar-nav">
-          <button 
-            onClick={() => { 
+          <a 
+            href="#" 
+            onClick={(e) => { 
+              e.preventDefault(); 
               setCurrentTab('dashboard'); 
               toggleSidebar(); 
             }} 
             className={`sidebar-nav-item ${currentTab === 'dashboard' ? 'active' : ''}`}
           >
-            <i className="fas fa-tachometer-alt"></i>
             Dashboard
-          </button>
-          <button 
-            onClick={() => { 
+          </a>
+          <a 
+            href="#" 
+            onClick={(e) => { 
+              e.preventDefault(); 
               setCurrentTab('estatisticas'); 
               toggleSidebar(); 
             }} 
             className={`sidebar-nav-item ${currentTab === 'estatisticas' ? 'active' : ''}`}
           >
-            <i className="fas fa-chart-bar"></i>
             Estatísticas Gerais
-          </button>
-          <button 
-            onClick={() => { 
+          </a>
+          <a 
+            href="#" 
+            onClick={(e) => { 
+              e.preventDefault(); 
               setCurrentTab('relatorios'); 
               toggleSidebar(); 
             }} 
             className={`sidebar-nav-item ${currentTab === 'relatorios' ? 'active' : ''}`}
           >
-            <i className="fas fa-file-alt"></i>
             Relatórios Diários
-          </button>
-          <button 
-            onClick={() => { 
+          </a>
+          <a 
+            href="#" 
+            onClick={(e) => { 
+              e.preventDefault(); 
               setCurrentTab('cadastro'); 
               toggleSidebar(); 
             }} 
             className={`sidebar-nav-item ${currentTab === 'cadastro' ? 'active' : ''}`}
           >
-            <i className="fas fa-plus-circle"></i>
             Novo Cadastro
-          </button>
+          </a>
           {localStorage.getItem('userType') === 'admin' && (
-            <button
-              onClick={() => {
-                navigate('/cadastro-usuarios');
-                toggleSidebar();
-              }}
+            <a 
+              href="/cadastro-usuarios" 
               className="sidebar-nav-item"
+              onClick={(e) => toggleSidebar()}
             >
-              <i className="fas fa-users"></i>
               Cadastrar Usuários
-            </button>
+            </a>
           )}
-          <button
-            className="sidebar-nav-item"
-            onClick={handleLogout}
-            style={{ marginLeft: 'auto' }}
-          >
-            <i className="fas fa-sign-out-alt"></i>
-            Sair
-          </button>
         </nav>
         <div className="sidebar-footer">
           <p>TrackPro v1.0</p>
@@ -2667,46 +2677,40 @@ const App = () => {
             className={`nav-button ${currentTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setCurrentTab('dashboard')}
           >
-            <i className="fas fa-tachometer-alt"></i>
             Dashboard
           </button>
           <button
             className={`nav-button ${currentTab === 'estatisticas' ? 'active' : ''}`}
             onClick={() => setCurrentTab('estatisticas')}
           >
-            <i className="fas fa-chart-bar"></i>
             Estatísticas Gerais
           </button>
           <button
             className={`nav-button ${currentTab === 'relatorios' ? 'active' : ''}`}
             onClick={() => setCurrentTab('relatorios')}
           >
-            <i className="fas fa-file-alt"></i>
             Relatórios Diários
           </button>
           <button
             className={`nav-button ${currentTab === 'cadastro' ? 'active' : ''}`}
             onClick={() => setCurrentTab('cadastro')}
           >
-            <i className="fas fa-plus-circle"></i>
             Novo Cadastro
           </button>
           {localStorage.getItem('userType') === 'admin' && (
-            <button
-              onClick={() => navigate('/cadastro-usuarios')}
+            <a 
+              href="/cadastro-usuarios" 
               className="nav-button"
               style={{ textDecoration: 'none' }}
             >
-              <i className="fas fa-users"></i>
               Cadastrar Usuários
-            </button>
+            </a>
           )}
           <button
             className="nav-button"
             onClick={handleLogout}
             style={{ marginLeft: 'auto' }}
           >
-            <i className="fas fa-sign-out-alt"></i>
             Sair
           </button>
         </div>

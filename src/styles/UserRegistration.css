@@ -81,6 +81,8 @@
   text-decoration: none;
   transition: all 0.3s;
   box-shadow: 0 4px 6px rgba(52, 152, 219, 0.1);
+  width: 100%; /* Garante que o botão ocupe toda a largura */
+  margin-top: 10px; /* Adiciona um espaçamento acima do botão */
 }
 
 .button:hover {
@@ -108,6 +110,14 @@
 .button.secondary:hover {
   background-color: #27ae60;
   box-shadow: 0 6px 8px rgba(46, 204, 113, 0.2);
+}
+
+.terms-text {
+  font-size: 13px;
+  color: #7f8c8d;
+  text-align: center;
+  margin-top: 15px;
+  line-height: 1.5;
 }
 
 .error-message {
