@@ -1,23 +1,23 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
-// eslint-disable-next-line
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './styles.css';
-import { initDB, saveUserData, getUserData, clearUserData } from './utils/indexedDBUtil';
-
-// Inicialização do cliente Supabase (ainda usado para operações no banco de dados)
-const supabase = createClient(
-  'https://apidb.meumenu2023.uk',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzAzMzg2ODAwLAogICJleHAiOiAxODYxMjM5NjAwCn0.kU_d1xlxfuEgkYMC0mYoiZHQpUvRE2EnilTZ7S0bfIM'
-);
+import { initDB, saveUserData, clearUserData } from './utils/indexedDBUtil';
+// eslint-disable-next-line no-unused-vars
+import PlanoBloqueado from './components/PlanoBloqueado';
+import AuthService from './services/auth.service';
+import Dashboard from './components/Dashboard';
+import CadastroForm from './components/CadastroForm';
+import GerenciamentoUsuarios from './components/GerenciamentoUsuarios';
+import EstatisticasGerais from './components/EstatisticasGerais';
+import RelatoriosDiarios from './components/RelatoriosDiarios';
 
 // URLs dos webhooks n8n
 // eslint-disable-next-line no-unused-vars
-const N8N_CADASTRO_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/cadastro_trackeador';
-const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
+const N8N_CADASTRO_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/register';
+// eslint-disable-next-line no-unused-vars
+const N8N_LOGIN_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/login';
 
 // Componente de Login
-// eslint-disable-next-line no-unused-vars
 const LoginScreen = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,41 +35,42 @@ const LoginScreen = ({ onLogin }) => {
       
       console.log("Tentando fazer login com:", emailLowerCase, password);
       
-      // Autenticação via Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailLowerCase,
-        password: password,
+      // Autenticação via API
+      const data = await AuthService.login(emailLowerCase, password);
+      
+      // Salvar token no localStorage
+      localStorage.setItem('authToken', data.token);
+      
+      // Salvar informações do usuário
+      localStorage.setItem('dashboardAuthenticated', 'true');
+      localStorage.setItem('userType', data.user.tipo); // Armazenar o tipo (admin/user)
+      localStorage.setItem('userId', data.user.id); // Armazenar o ID do usuário
+      localStorage.setItem('userPlanStatus', data.user.status_plano || 'ativo'); // Armazenar o status do plano
+      localStorage.setItem('dashboardUser', JSON.stringify({
+        id: data.user.id,
+        email: data.user.email,
+        user_metadata: {
+          nome: data.user.nome || ''
+        }
+      }));
+      
+      console.log('Login bem-sucedido via API:');
+      console.log('- ID do usuário:', data.user.id);
+      console.log('- Tipo do usuário:', data.user.tipo);
+      
+      // Salvar dados no IndexedDB para acesso offline
+      await saveUserData({
+        uu_id: data.user.id,
+        email: data.user.email,
+        tipo: data.user.tipo,
+        nome: data.user.nome || '',
+        token: data.token
       });
       
-      console.log("Resposta do Supabase:", data, error);
-      
-      if (error) throw error;
-      
-      // Verificar se o usuário existe na tabela bravobet_users
-      const { data: userData, error: userError } = await supabase
-        .from('bravobet_users')
-        .select('*')
-        .eq('email', emailLowerCase)
-        .single();
-      
-      if (userError || !userData) {
-        // Usuário não está cadastrado na aplicação
-        await supabase.auth.signOut(); // Fazer logout do Auth
-        throw new Error('Usuário não autorizado para esta aplicação');
-      }
-      
-      // Salvar no localStorage para manter o login entre sessões
-      localStorage.setItem('dashboardAuthenticated', 'true');
-      localStorage.setItem('dashboardUser', JSON.stringify(data.user));
-      localStorage.setItem('userType', userData.tipo); // Armazenar o tipo (admin/user)
-      localStorage.setItem('userId', userData.id); // Armazenar o ID do usuário da tabela bravobet_users
-      
-      console.log('Login bem-sucedido:');
-      console.log('- ID do usuário (Auth):', data.user.id);
-      console.log('- ID do usuário (DB):', userData.id);
-      console.log('- Tipo do usuário:', userData.tipo);
-      
-      onLogin(data.user);
+      onLogin({
+        id: data.user.id,
+        email: data.user.email
+      });
     } catch (error) {
       console.error('Erro ao fazer login:', error.message);
       setError('Credenciais inválidas ou usuário não autorizado. Tente novamente.');
@@ -129,7 +130,8 @@ const LoginScreen = ({ onLogin }) => {
   );
 };
 
-// Componente Modal
+// Componente Modal (usado internamente)
+// eslint-disable-next-line no-unused-vars
 const Modal = ({ isOpen, onClose, title, children, footer }) => {
   if (!isOpen) return null;
 
@@ -154,6 +156,7 @@ const Modal = ({ isOpen, onClose, title, children, footer }) => {
 };
 
 // Componente de Formulário de Cadastro/Edição
+// eslint-disable-next-line no-unused-vars
 const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
   const [formData, setFormData] = useState({
     link: '',
@@ -175,10 +178,7 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
     const fetchUsers = async () => {
       if (userType === 'admin' && initialData.id) {
         try {
-          const { data, error } = await supabase
-            .from('bravobet_users')
-            .select('*')
-            .eq('tipo', 'user');
+          const { data, error } = await AuthService.getUsers();
             
           if (error) throw error;
           setUsers(data || []);
@@ -405,2324 +405,363 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
   );
 };
 
-// Componente de Cadastro
-const CadastroForm = ({ onCadastroSuccess }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [users, setUsers] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const userType = localStorage.getItem('userType');
-  const currentUserId = localStorage.getItem('userId');
-
-  // Buscar usuários do tipo 'user' se o usuário atual for admin
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (userType === 'admin') {
-        try {
-          const { data, error } = await supabase
-            .from('bravobet_users')
-            .select('*')
-            .eq('tipo', 'user');
-            
-          if (error) throw error;
-          setUsers(data || []);
-        } catch (err) {
-          console.error('Erro ao buscar usuários:', err.message);
-        }
-      }
-    };
-    
-    fetchUsers();
-  }, [userType]);
-
-  const handleSubmit = async (formData) => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Determinar o user_id com base no tipo de usuário e seleção
-      let user_id = null; // Inicialmente null para que seja visível para admins
-      
-      // Se for admin e selecionou um usuário, usar o UUID do usuário selecionado
-      if (userType === 'admin' && selectedUserId) {
-        user_id = selectedUserId; // Agora é uma string UUID
-      } 
-      // Se for usuário comum, sempre usar o próprio UUID
-      else if (userType === 'user') {
-        user_id = currentUserId; // Agora é uma string UUID
-      }
-      
-      // Remover o campo selected_user_id do formData para evitar erro
-      const { selected_user_id, ...dataToInsert } = formData;
-      
-      console.log('Cadastrando link com user_id:', user_id, 'tipo:', typeof user_id);
-      
-      const { error } = await supabase
-        .from('bravobet_links_personalizados')
-        .insert([{ 
-          ...dataToInsert,
-          user_id: user_id,
-          quantidade_entrada: 0,
-          entrada_total_grupo: 0,
-          saidas_totais: 0,
-          saidas_que_usaram_link: 0
-        }]);
-
-      if (error) throw error;
-      alert('Link cadastrado com sucesso!');
-      onCadastroSuccess();
-    } catch (error) {
-      setError('Erro ao cadastrar: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="form-container">
-      <h2 className="form-title">Cadastrar Novo Link</h2>
-      
-      {userType === 'admin' && (
-        <div className="form-group">
-          <label className="form-label">Atribuir a Usuário:</label>
-          <select 
-            className="form-input"
-            value={selectedUserId}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-          >
-            <option value="">Selecione um usuário (opcional)</option>
-            {users.map(user => (
-              <option key={user.uu_id} value={user.uu_id}>
-                {user.email}
-              </option>
-            ))}
-          </select>
-          <div className="form-instructions">
-            <p>Se não selecionar um usuário, o link será atribuído a você.</p>
-          </div>
-        </div>
-      )}
-      
-      <LinkForm onSubmit={handleSubmit} buttonText="Cadastrar" />
-      
-      {error && <div className="error-message">{error}</div>}
-      {loading && <div className="loading-message">Cadastrando...</div>}
-    </div>
-  );
-};
-
-// Componente de Dashboard
-const Dashboard = ({ setCurrentTab, currentTab }) => {
-  const [links, setLinks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [editingLink, setEditingLink] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [linkToDelete, setLinkToDelete] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [statsModalOpen, setStatsModalOpen] = useState(false);
-  const [selectedLinkStats, setSelectedLinkStats] = useState(null);
-  const linksPerPage = 10;
-
-  // Filtrar links com base no termo de busca
-  const filteredLinks = links.filter(link => 
-    link.nome_link.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    link.expert_apelido.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Calcular links para a página atual
-  const indexOfLastLink = currentPage * linksPerPage;
-  const indexOfFirstLink = indexOfLastLink - linksPerPage;
-  const currentLinks = filteredLinks.slice(indexOfFirstLink, indexOfLastLink);
-  
-  // Calcular número total de páginas
-  const totalPages = Math.ceil(filteredLinks.length / linksPerPage);
-
-  // Mudar de página
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  const fetchLinks = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      // Obter o tipo de usuário e UUID do localStorage
-      const userType = localStorage.getItem('userType');
-      const userId = localStorage.getItem('userId');
-      
-      console.log('Dashboard - Tipo de usuário:', userType);
-      console.log('Dashboard - UUID do usuário:', userId);
-      console.log('Dashboard - Tipo do UUID:', typeof userId);
-      
-      // Construir a consulta com base no tipo de usuário
-      let query = supabase.from('bravobet_links_personalizados').select('*');
-      
-      // Se não for admin, filtrar apenas os links do usuário
-      if (userType !== 'admin') {
-        query = query.eq('user_id', userId); // Agora é uma string UUID
-        console.log('Dashboard - UUID convertido para string:', userId);
-      } else {
-        console.log('Dashboard - Usuário é admin, mostrando todos os links');
-      }
-      
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Dashboard - Erro na consulta:', error);
-        throw error;
-      }
-      
-      console.log('Dashboard - Links retornados:', data);
-      console.log('Dashboard - Quantidade de links:', data ? data.length : 0);
-      
-      // Buscar contagem de leads para cada link
-      const linksWithLeadCount = await Promise.all((data || []).map(async (link) => {
-        const { count, error: countError } = await supabase
-          .from('bravobet_leads_telegram')
-          .select('id', { count: 'exact', head: true })
-          .eq('nome_invite_link_usado', link.nome_link);
-          
-        if (countError) {
-          console.error('Erro ao buscar contagem de leads:', countError.message);
-          return { ...link, lead_count: 0 };
-        }
-        
-        return { ...link, lead_count: count || 0 };
-      }));
-      
-      setLinks(linksWithLeadCount || []);
-    } catch (error) {
-      console.error('Erro ao buscar links:', error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLinks();
-  }, [fetchLinks]);
-
-  const handleEdit = (link) => {
-    setEditingLink(link);
-  };
-
-  const handleUpdate = async (formData) => {
-    try {
-      // Remover campos que não existem na tabela
-      const { lead_count, ...dataToUpdate } = formData;
-      
-      // Se for admin e tiver um usuário selecionado para edição, atualizar o user_id
-      if (formData.selected_user_id) {
-        dataToUpdate.user_id = formData.selected_user_id; // Agora é uma string UUID
-      }
-      
-      const { error } = await supabase
-        .from('bravobet_links_personalizados')
-        .update(dataToUpdate)
-        .eq('id', formData.id);
-
-      if (error) throw error;
-      alert('Link atualizado com sucesso!');
-      setEditingLink(null);
-      fetchLinks();
-    } catch (error) {
-      alert('Erro ao atualizar: ' + error.message);
-    }
-  };
-
-  const handleDeleteClick = (link) => {
-    setLinkToDelete(link);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleDelete = async () => {
-    if (!linkToDelete) return;
-    
-    try {
-      const { error } = await supabase
-        .from('bravobet_links_personalizados')
-        .delete()
-        .eq('id', linkToDelete.id);
-
-      if (error) throw error;
-      alert('Link excluído com sucesso!');
-      setIsDeleteModalOpen(false);
-      setLinkToDelete(null);
-      fetchLinks();
-    } catch (error) {
-      alert('Erro ao excluir: ' + error.message);
-    }
-  };
-
-  const handleStatsClick = (link) => {
-    setSelectedLinkStats(link);
-    setStatsModalOpen(true);
-  };
-
-  // Função para determinar cor com base no desempenho
-  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
-    const numValue = parseFloat(value);
-    
-    if (higherIsBetter) {
-      // Quanto maior o valor, melhor o desempenho
-      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
-      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
-      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    } else {
-      // Quanto menor o valor, melhor o desempenho
-      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
-      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
-      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    }
-  }, []);
-
-  // Calcular estatísticas para o link selecionado
-  const calculateStats = useCallback((link) => {
-    // Porcentagem de entradas pelo link em relação às entradas totais
-    const entryPercentage = link.entrada_total_grupo > 0 
-      ? ((link.quantidade_entrada / link.entrada_total_grupo) * 100).toFixed(2)
-      : 0;
-    
-    // Relação de pessoas que saem que entraram pelo link vs saídas totais
-    const exitRatio = link.saidas_totais > 0
-      ? ((link.saidas_que_usaram_link / link.saidas_totais) * 100).toFixed(2)
-      : 0;
-    
-    // Média de entradas por dia
-    let entriesPerDay = 0;
-    if (link.created_at) {
-      const creationDate = new Date(link.created_at);
-      const currentDate = new Date();
-      const diffTime = Math.abs(currentDate - creationDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      entriesPerDay = diffDays > 0 
-        ? (link.quantidade_entrada / diffDays).toFixed(2)
-        : link.quantidade_entrada;
-    }
-    
-    // Determinar cores com base no desempenho
-    // Para entradas: quanto maior a porcentagem, melhor (verde = bom)
-    const entryColor = getColorByPerformance(entryPercentage, true);
-    
-    // Para saídas: quanto menor a porcentagem, melhor (verde = bom)
-    const exitColor = getColorByPerformance(exitRatio, false);
-    
-    // Para média diária: valores mais altos são melhores
-    const dailyColor = getColorByPerformance(entriesPerDay, true, 5); // 5 é um valor de referência
-    
-    return {
-      entryPercentage,
-      exitRatio,
-      entriesPerDay,
-      entryColor,
-      exitColor,
-      dailyColor
-    };
-  }, [getColorByPerformance]);
-
-  // Adicionar função de diagnóstico detalhada
-  const runDiagnostics = async () => {
-    try {
-      console.log('Iniciando diagnóstico detalhado...');
-      
-      // 1. Verificar o usuário atual
-      const userType = localStorage.getItem('userType');
-      const userId = localStorage.getItem('userId');
-      console.log('Usuário atual - Tipo:', userType);
-      console.log('Usuário atual - UUID:', userId);
-      console.log('Usuário atual - Tipo do UUID:', typeof userId);
-      
-      // 2. Verificar o link VINI_LP1
-      const { data: linkData } = await supabase
-        .from('bravobet_links_personalizados')
-        .select('*')
-        .eq('nome_link', 'VINI_LP1');
-      
-      console.log('Link VINI_LP1 encontrado:', linkData);
-      
-      // 3. Testar consulta direta com o UUID do usuário atual
-      if (userId) {
-        console.log('Testando consulta direta com o UUID do usuário atual...');
-        
-        // Teste com o UUID como está no localStorage
-        const { data: testRaw } = await supabase
-          .from('bravobet_links_personalizados')
-          .select('*')
-          .eq('user_id', userId);
-        
-        console.log('Consulta com user_id como está no localStorage:', testRaw ? testRaw.length : 0, 'resultados');
-        
-        // Teste com o UUID como UUID
-        const { data: testUUID } = await supabase
-          .from('bravobet_links_personalizados')
-          .select('*')
-          .eq('user_id', userId);
-      
-        console.log('Consulta com user_id como UUID:', testUUID ? testUUID.length : 0, 'resultados');
-        if (testUUID && testUUID.length > 0) {
-          console.log('Primeiro link encontrado:', testUUID[0].nome_link);
-        }
-      }
-    } catch (error) {
-      console.error('Erro no diagnóstico:', error);
-    }
-  };
-
-  useEffect(() => {
-    runDiagnostics();
-  }, []);
-
-  return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h2>Dashboard de Links</h2>
-        <button onClick={fetchLinks} className="button button-update button-small">
-          Atualizar Dados
-        </button>
-      </div>
-
-      {/* Barra de busca */}
-      <div className="search-container">
-        <input
-          type="text"
-          placeholder="Buscar por nome do link ou apelido do expert..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1); // Resetar para a primeira página ao buscar
-          }}
-          className="search-input"
-        />
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>Carregando...</div>
-      ) : (
-        <>
-          <div className="cards-grid">
-            {currentLinks.map((link) => (
-              <div key={link.id} className="card">
-                <div className="card-header">
-                  <h3 className="card-title">{link.group_name}</h3>
-                  <p className="card-subtitle">Expert: {link.expert_apelido}</p>
-                </div>
-                
-                <div className="card-stats">
-                  <div className="stats-row">
-                    <span>Entradas pelo link:</span>
-                    <span style={{ color: '#34a853', fontWeight: 'bold' }}>{link.quantidade_entrada || 0}</span>
-                  </div>
-                  <div className="stats-row">
-                    <span>Entradas totais:</span>
-                    <span style={{ color: '#4285F4', fontWeight: 'bold' }}>{link.entrada_total_grupo || 0}</span>
-                  </div>
-                  <div className="stats-row">
-                    <span>Saídas totais:</span>
-                    <span style={{ color: '#EA4335', fontWeight: 'bold' }}>{link.saidas_totais || 0}</span>
-                  </div>
-                  <div className="stats-row">
-                    <span>Saídas de usuários que usaram o link:</span>
-                    <span style={{ color: '#FBBC05', fontWeight: 'bold' }}>{link.saidas_que_usaram_link || 0}</span>
-                  </div>
-                  <div className="stats-row">
-                    <span>Leads:</span>
-                    <span style={{ color: '#34a853', fontWeight: 'bold' }}>{link.lead_count || 0}</span>
-                  </div>
-                </div>
-                
-                <div className="card-content">
-                  <p><strong>Nome:</strong> {link.nome_link}</p>
-                  <p><strong>Link:</strong> {link.link}</p>
-                  <p><strong>ID do Canal:</strong> {link.id_channel_telegram || 'Não definido'}</p>
-                  <p><strong>Pixel ID:</strong> {link.pixel_id}</p>
-                  <p><strong>Data de Criação:</strong> {link.created_at ? new Date(link.created_at).toLocaleString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }) : 'Não disponível'}</p>
-                </div>
-
-                <div className="card-actions">
-                  <button 
-                    className="button" 
-                    onClick={() => handleEdit(link)}
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    className="button button-danger" 
-                    onClick={() => handleDeleteClick(link)}
-                  >
-                    Excluir
-                  </button>
-                  <button 
-                    className="button" 
-                    onClick={() => handleStatsClick(link)}
-                  >
-                    Estatísticas
-                  </button>
-                  <a
-                    href={link.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="card-link"
-                  >
-                    Abrir Link →
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Paginação */}
-          {totalPages > 1 && (
-            <div className="pagination">
-              <button 
-                onClick={() => paginate(currentPage - 1)} 
-                disabled={currentPage === 1}
-                className="pagination-button"
-              >
-                &laquo; Anterior
-              </button>
-              
-              <span className="pagination-info">
-                Página {currentPage} de {totalPages}
-              </span>
-              
-              <button 
-                onClick={() => paginate(currentPage + 1)} 
-                disabled={currentPage === totalPages}
-                className="pagination-button"
-              >
-                Próxima &raquo;
-              </button>
-            </div>
-          )}
-        </>
-      )}
-      
-      {/* Modal de Edição */}
-      <Modal 
-        isOpen={editingLink !== null} 
-        onClose={() => setEditingLink(null)}
-        title="Editar Link"
-      >
-        {editingLink && (
-          <LinkForm 
-            initialData={editingLink} 
-            onSubmit={handleUpdate} 
-            buttonText="Atualizar"
-          />
-        )}
-      </Modal>
-
-      {/* Modal de Estatísticas */}
-      <Modal
-        isOpen={statsModalOpen}
-        onClose={() => setStatsModalOpen(false)}
-        title={`Estatísticas: ${selectedLinkStats?.nome_link || ''}`}
-      >
-        {selectedLinkStats && (
-          <div className="stats-modal-content">
-            <div className="stats-section">
-              <h3>Entradas pelo Link vs. Entradas Totais</h3>
-              <div className="stats-info">
-                <p>{calculateStats(selectedLinkStats).entryPercentage}% das entradas totais vieram através deste link</p>
-              </div>
-              <div className="stats-bar-container">
-                <div 
-                  className="stats-bar" 
-                  style={{ 
-                    width: `${calculateStats(selectedLinkStats).entryPercentage}%`, 
-                    backgroundColor: calculateStats(selectedLinkStats).entryColor 
-                  }}
-                >
-                  {calculateStats(selectedLinkStats).entryPercentage > 10
-                    ? `${calculateStats(selectedLinkStats).entryPercentage}%` 
-                    : ''}
-                </div>
-              </div>
-              <div className="stats-legend">
-                <div className="stats-legend-item">
-                  <span className="stats-dot entry-dot"></span>
-                  <span>Entradas pelo link: {selectedLinkStats.quantidade_entrada}</span>
-                </div>
-                <div className="stats-legend-item">
-                  <span className="stats-dot total-dot"></span>
-                  <span>Entradas totais: {selectedLinkStats.entrada_total_grupo}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="stats-section">
-              <h3>Relação de Saídas</h3>
-              <div className="stats-info">
-                <p>{calculateStats(selectedLinkStats).exitRatio}% das saídas são de usuários que entraram por este link</p>
-              </div>
-              <div className="stats-bar-container">
-                <div 
-                  className="stats-bar exit-bar" 
-                  style={{ 
-                    width: `${calculateStats(selectedLinkStats).exitRatio}%`, 
-                    backgroundColor: calculateStats(selectedLinkStats).exitColor 
-                  }}
-                >
-                  {calculateStats(selectedLinkStats).exitRatio > 10
-                    ? `${calculateStats(selectedLinkStats).exitRatio}%` 
-                    : ''}
-                </div>
-              </div>
-              <div className="stats-legend">
-                <div className="stats-legend-item">
-                  <span className="stats-dot exit-link-dot"></span>
-                  <span>Saídas de usuários que usaram o link: {selectedLinkStats.saidas_que_usaram_link}</span>
-                </div>
-                <div className="stats-legend-item">
-                  <span className="stats-dot exit-total-dot"></span>
-                  <span>Saídas totais: {selectedLinkStats.saidas_totais}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="stats-section">
-              <h3>Média de Entradas por Dia</h3>
-              <div className="stats-info">
-                <p>Em média, {calculateStats(selectedLinkStats).entriesPerDay} pessoas entram por dia através deste link</p>
-              </div>
-              <div className="stats-value">
-                <span className="stats-number" style={{ color: calculateStats(selectedLinkStats).dailyColor }}>
-                  {calculateStats(selectedLinkStats).entriesPerDay}
-                </span>
-                <span className="stats-unit">entradas/dia</span>
-              </div>
-              <div className="stats-date-info">
-                <p>Link criado em: {selectedLinkStats.created_at ? new Date(selectedLinkStats.created_at).toLocaleDateString('pt-BR') : 'Data desconhecida'}</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Modal de Confirmação de Exclusão */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirmar Exclusão"
-        footer={
-          <>
-            <button 
-              className="button" 
-              onClick={() => setIsDeleteModalOpen(false)}
-            >
-              Cancelar
-            </button>
-            <button 
-              className="button button-danger" 
-              onClick={handleDelete}
-            >
-              Excluir
-            </button>
-          </>
-        }
-      >
-        <p>Tem certeza que deseja excluir o link "{linkToDelete?.nome_link}"?</p>
-        <p>Esta ação não pode ser desfeita.</p>
-      </Modal>
-    </div>
-  );
-};
-
-// Componente de Estatísticas Gerais
-const EstatisticasGerais = () => {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalLinks: 0,
-    totalEntradas: 0,
-    totalEntradasGrupo: 0,
-    totalSaidas: 0,
-    totalSaidasUsaramLink: 0,
-    totalLeads: 0,
-    expertStats: [],
-    groupStats: []
-  });
-  
-  // Obter o tipo de usuário e UUID do localStorage
-  const userType = localStorage.getItem('userType');
-  const userId = localStorage.getItem('userId');
-  
-  // Função para determinar cor com base no desempenho
-  const getColorByPerformance = useCallback((value, higherIsBetter, reference = 50) => {
-    const numValue = parseFloat(value);
-    
-    if (higherIsBetter) {
-      // Quanto maior o valor, melhor o desempenho
-      if (numValue >= reference * 0.8) return '#34a853'; // Verde - Excelente
-      if (numValue >= reference * 0.6) return '#4285F4'; // Azul - Bom
-      if (numValue >= reference * 0.4) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    } else {
-      // Quanto menor o valor, melhor o desempenho
-      if (numValue <= reference * 0.2) return '#34a853'; // Verde - Excelente
-      if (numValue <= reference * 0.4) return '#4285F4'; // Azul - Bom
-      if (numValue <= reference * 0.6) return '#FBBC05'; // Amarelo - Médio
-      return '#EA4335'; // Vermelho - Precisa melhorar
-    }
-  }, []);
-
-  const calculateStats = useCallback((linksData) => {
-    // Estatísticas totais
-    const totalLinks = linksData.length;
-    const totalEntradas = linksData.reduce((sum, link) => sum + (link.quantidade_entrada || 0), 0);
-    const totalEntradasGrupo = linksData.reduce((sum, link) => sum + (link.entrada_total_grupo || 0), 0);
-    const totalSaidas = linksData.reduce((sum, link) => sum + (link.saidas_totais || 0), 0);
-    const totalSaidasUsaramLink = linksData.reduce((sum, link) => sum + (link.saidas_que_usaram_link || 0), 0);
-    const totalLeads = linksData.reduce((sum, link) => sum + (link.lead_count || 0), 0);
-
-    // Estatísticas por expert
-    const expertMap = new Map();
-    linksData.forEach(link => {
-      if (!link.expert_apelido) return;
-      
-      if (!expertMap.has(link.expert_apelido)) {
-        expertMap.set(link.expert_apelido, {
-          expert: link.expert_apelido,
-          links: 0,
-          entradas: 0,
-          entradasGrupo: 0,
-          saidas: 0,
-          saidasUsaramLink: 0,
-          leads: 0
-        });
-      }
-      
-      const expertStats = expertMap.get(link.expert_apelido);
-      expertStats.links += 1;
-      expertStats.entradas += (link.quantidade_entrada || 0);
-      expertStats.entradasGrupo += (link.entrada_total_grupo || 0);
-      expertStats.saidas += (link.saidas_totais || 0);
-      expertStats.saidasUsaramLink += (link.saidas_que_usaram_link || 0);
-      expertStats.leads += (link.lead_count || 0);
-    });
-    
-    // Estatísticas por grupo
-    const groupMap = new Map();
-    linksData.forEach(link => {
-      if (!link.group_name) return;
-      
-      if (!groupMap.has(link.group_name)) {
-        groupMap.set(link.group_name, {
-          grupo: link.group_name,
-          links: 0,
-          entradas: 0,
-          entradasGrupo: 0,
-          saidas: 0,
-          saidasUsaramLink: 0,
-          leads: 0
-        });
-      }
-      
-      const groupStats = groupMap.get(link.group_name);
-      groupStats.links += 1;
-      groupStats.entradas += (link.quantidade_entrada || 0);
-      groupStats.entradasGrupo += (link.entrada_total_grupo || 0);
-      groupStats.saidas += (link.saidas_totais || 0);
-      groupStats.saidasUsaramLink += (link.saidas_que_usaram_link || 0);
-      groupStats.leads += (link.lead_count || 0);
-    });
-
-    // Ordenar por número de entradas (decrescente)
-    const expertStats = Array.from(expertMap.values()).sort((a, b) => b.entradas - a.entradas);
-    const groupStats = Array.from(groupMap.values()).sort((a, b) => b.entradas - a.entradas);
-
-    setStats({
-      totalLinks,
-      totalEntradas,
-      totalEntradasGrupo,
-      totalSaidas,
-      totalSaidasUsaramLink,
-      totalLeads,
-      expertStats,
-      groupStats
-    });
-  }, []);
-
-  const fetchLinks = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      // Construir a consulta com base no tipo de usuário
-      let query = supabase.from('bravobet_links_personalizados').select('*');
-      
-      // Se não for admin, filtrar apenas os links do usuário
-      if (userType !== 'admin') {
-        query = query.eq('user_id', userId); // Agora é uma string UUID
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      
-      // Buscar contagem de leads para cada link
-      const linksWithLeadCount = await Promise.all(data.map(async (link) => {
-        const { count, error: countError } = await supabase
-          .from('bravobet_leads_telegram')
-          .select('id', { count: 'exact', head: true })
-          .eq('nome_invite_link_usado', link.nome_link);
-          
-        if (countError) {
-          console.error('Erro ao buscar contagem de leads:', countError.message);
-          return { ...link, lead_count: 0 };
-        }
-        
-        return { ...link, lead_count: count || 0 };
-      }));
-      
-      calculateStats(linksWithLeadCount || []);
-    } catch (error) {
-      console.error('Erro ao buscar links:', error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [calculateStats, userType, userId]);
-
-  useEffect(() => {
-    fetchLinks();
-  }, [fetchLinks]);
-
-  // Calcular porcentagens e taxas
-  const calcularTaxaConversao = useCallback(() => {
-    return stats.totalEntradasGrupo > 0 
-      ? ((stats.totalEntradas / stats.totalEntradasGrupo) * 100).toFixed(2)
-      : 0;
-  }, [stats.totalEntradas, stats.totalEntradasGrupo]);
-
-  const calcularTaxaSaida = useCallback(() => {
-    return stats.totalSaidas > 0 
-      ? ((stats.totalSaidasUsaramLink / stats.totalSaidas) * 100).toFixed(2)
-      : 0;
-  }, [stats.totalSaidas, stats.totalSaidasUsaramLink]);
-
-  return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h2>Estatísticas Gerais</h2>
-        <button onClick={fetchLinks} className="button button-update button-small">
-          Atualizar Dados
-        </button>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>Carregando...</div>
-      ) : (
-        <div className="estatisticas-gerais">
-          {/* Resumo geral */}
-          <div className="stats-overview">
-            <div className="stats-card">
-              <h3>Total de Links</h3>
-              <div className="stats-value">{stats.totalLinks}</div>
-            </div>
-            <div className="stats-card">
-              <h3>Total de Entradas</h3>
-              <div className="stats-value" style={{ color: '#34a853' }}>{stats.totalEntradas}</div>
-            </div>
-            <div className="stats-card">
-              <h3>Total de Entradas nos Grupos</h3>
-              <div className="stats-value" style={{ color: '#4285F4' }}>{stats.totalEntradasGrupo}</div>
-            </div>
-            <div className="stats-card">
-              <h3>Total de Saídas</h3>
-              <div className="stats-value" style={{ color: '#EA4335' }}>{stats.totalSaidas}</div>
-            </div>
-            <div className="stats-card">
-              <h3>Saídas de Usuários que Usaram Links</h3>
-              <div className="stats-value" style={{ color: '#FBBC05' }}>{stats.totalSaidasUsaramLink}</div>
-            </div>
-            <div className="stats-card">
-              <h3>Total de Leads</h3>
-              <div className="stats-value" style={{ color: '#34a853' }}>{stats.totalLeads}</div>
-            </div>
-          </div>
-
-          {/* Gráficos de conversão */}
-          <div className="stats-graphs">
-            <div className="stats-section">
-              <h3>Taxa de Conversão de Entradas</h3>
-              <div className="stats-info">
-                <p>{calcularTaxaConversao()}% das entradas totais vieram através dos links</p>
-              </div>
-              <div className="stats-bar-container">
-                <div 
-                  className="stats-bar" 
-                  style={{ 
-                    width: `${calcularTaxaConversao()}%`, 
-                    backgroundColor: getColorByPerformance(calcularTaxaConversao(), true) 
-                  }}
-                >
-                  {calcularTaxaConversao() > 10
-                    ? `${calcularTaxaConversao()}%` 
-                    : '0%'}
-                </div>
-              </div>
-            </div>
-
-            <div className="stats-section">
-              <h3>Taxa de Saídas</h3>
-              <div className="stats-info">
-                <p>{calcularTaxaSaida()}% das saídas são de usuários que entraram pelos links</p>
-              </div>
-              <div className="stats-bar-container">
-                <div 
-                  className="stats-bar exit-bar" 
-                  style={{ 
-                    width: `${calcularTaxaSaida()}%`, 
-                    backgroundColor: getColorByPerformance(calcularTaxaSaida(), false) 
-                  }}
-                >
-                  {calcularTaxaSaida() > 10
-                    ? `${calcularTaxaSaida()}%` 
-                    : '0%'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Estatísticas por expert */}
-          <div className="stats-table-section">
-            <h3>Estatísticas por Expert</h3>
-            <div className="table-container">
-              <table className="stats-table">
-                <thead>
-                  <tr>
-                    <th>Expert</th>
-                    <th>Links</th>
-                    <th>Entradas</th>
-                    <th>Entradas no Grupo</th>
-                    <th>Taxa de Conversão</th>
-                    <th>Saídas</th>
-                    <th>Saídas (Usaram Link)</th>
-                    <th>Leads</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.expertStats.map((expert, index) => {
-                    const taxaConversao = expert.entradasGrupo > 0 
-                      ? ((expert.entradas / expert.entradasGrupo) * 100).toFixed(2)
-                      : 0;
-                    
-                    return (
-                      <tr key={index}>
-                        <td>{expert.expert}</td>
-                        <td>{expert.links}</td>
-                        <td>{expert.entradas}</td>
-                        <td>{expert.entradasGrupo}</td>
-                        <td style={{ color: getColorByPerformance(taxaConversao, true) }}>
-                          {taxaConversao > 10
-                            ? `${taxaConversao}%` 
-                            : '0%'}
-                        </td>
-                        <td>{expert.saidas}</td>
-                        <td>{expert.saidasUsaramLink}</td>
-                        <td>{expert.leads}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Estatísticas por grupo */}
-          <div className="stats-table-section">
-            <h3>Estatísticas por Grupo</h3>
-            <div className="table-container">
-              <table className="stats-table">
-                <thead>
-                  <tr>
-                    <th>Grupo</th>
-                    <th>Links</th>
-                    <th>Entradas</th>
-                    <th>Entradas no Grupo</th>
-                    <th>Taxa de Conversão</th>
-                    <th>Saídas</th>
-                    <th>Saídas (Usaram Link)</th>
-                    <th>Leads</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.groupStats.map((grupo, index) => {
-                    const taxaConversao = grupo.entradasGrupo > 0 
-                      ? ((grupo.entradas / grupo.entradasGrupo) * 100).toFixed(2)
-                      : 0;
-                    
-                    return (
-                      <tr key={index}>
-                        <td>{grupo.grupo}</td>
-                        <td>{grupo.links}</td>
-                        <td>{grupo.entradas}</td>
-                        <td>{grupo.entradasGrupo}</td>
-                        <td style={{ color: getColorByPerformance(taxaConversao, true) }}>
-                          {taxaConversao > 10
-                            ? `${taxaConversao}%` 
-                            : '0%'}
-                        </td>
-                        <td>{grupo.saidas}</td>
-                        <td>{grupo.saidasUsaramLink}</td>
-                        <td>{grupo.leads}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Componente de Relatórios Diários
-const RelatoriosDiarios = () => {
-  const [loading, setLoading] = useState(false);
-  const [links, setLinks] = useState([]);
-  const [selectedLink, setSelectedLink] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
-  const [relatorio, setRelatorio] = useState(null);
-  const [error, setError] = useState('');
-  const [buscaRealizada, setBuscaRealizada] = useState(false);
-  const [valorInvestido, setValorInvestido] = useState('');
-  const [cpa, setCpa] = useState(null);
-  const [entradasDetalhadas, setEntradasDetalhadas] = useState({
-    porCampanha: [],
-    porAnuncio: [],
-    porPlataforma: [],
-    porUrlLp: []
-  });
-  const [loadingEntradas, setLoadingEntradas] = useState(false);
-  const userType = localStorage.getItem('userType');
-  const userId = localStorage.getItem('userId');
-
-  const getColorByPerformance = (value) => {
-    if (value >= 80) return '#34a853'; // Verde - Excelente
-    if (value >= 50) return '#4285F4'; // Azul - Bom
-    if (value >= 30) return '#FBBC05'; // Amarelo - Regular
-    return '#EA4335'; // Vermelho - Baixo
-  };
-
-  const getColorByCPA = (cpa) => {
-    if (cpa <= 10) return '#34A853'; // Verde - Bom (CPA baixo é bom)
-    if (cpa <= 20) return '#FBBC05'; // Amarelo - Médio
-    return '#EA4335'; // Vermelho - Ruim (CPA alto é ruim)
-  };
-
-  // Formatar valor em reais
-  const formatarValorReais = (valor) => {
-    if (!valor) return 'R$ 0,00';
-    
-    // Se o valor já começar com R$, retorna ele mesmo
-    if (typeof valor === 'string' && valor.startsWith('R$')) {
-      return valor;
-    }
-    
-    // Tenta converter para número
-    const numero = typeof valor === 'string' ? 
-      parseFloat(valor.replace(/[^\d,]/g, '').replace(',', '.')) : 
-      parseFloat(valor);
-    
-    if (isNaN(numero)) return 'R$ 0,00';
-    
-    return `R$ ${numero.toFixed(2).replace('.', ',')}`;
-  };
-
-  const formatarEntradaValor = (e) => {
-    // Pega o valor digitado pelo usuário
-    let valor = e.target.value;
-    
-    // Remove o prefixo R$ se existir
-    if (valor.startsWith('R$ ')) {
-      valor = valor.substring(3);
-    }
-    
-    // Permite apenas números e vírgula
-    valor = valor.replace(/[^\d,]/g, '');
-    
-    // Atualiza o estado com o valor formatado
-    setValorInvestido(valor ? `R$ ${valor}` : '');
-  };
-
-  useEffect(() => {
-    if (relatorio && valorInvestido) {
-      console.log("Calculando CPA:");
-      console.log("Valor investido:", valorInvestido);
-      console.log("Entradas pelo link:", relatorio.entradas_link);
-      
-      // Limpar o valor investido (remover R$ e converter vírgula para ponto)
-      const valorLimpo = valorInvestido.replace(/[R$\s]/g, '').replace(',', '.');
-      const valorNumerico = parseFloat(valorLimpo);
-      
-      console.log("Valor limpo:", valorLimpo);
-      console.log("Valor numérico:", valorNumerico);
-      
-      if (!isNaN(valorNumerico) && relatorio.entradas_link > 0) {
-        // Fórmula do CPA: valor investido / entradas pelo link
-        const cpaCalculado = valorNumerico / relatorio.entradas_link;
-        console.log("CPA calculado:", cpaCalculado);
-        setCpa(cpaCalculado);
-      } else {
-        console.log("Não foi possível calcular o CPA. Valor numérico válido:", !isNaN(valorNumerico), "Entradas > 0:", relatorio.entradas_link > 0);
-        setCpa(null);
-      }
-    } else {
-      console.log("Não há relatório ou valor investido para calcular CPA");
-      setCpa(null);
-    }
-  }, [valorInvestido, relatorio]);
-
-  const buscarRelatorio = async () => {
-    if (!selectedLink || !startDate || !endDate) {
-      setError('Por favor, selecione um link e um período de datas.');
-      return;
-    }
-
-    // Verificar se a data final é maior ou igual à data inicial
-    if (new Date(endDate) < new Date(startDate)) {
-      setError('A data final deve ser maior ou igual à data inicial.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setLoadingEntradas(true);
-      setError('');
-      setBuscaRealizada(true);
-      
-      console.log('Buscando relatório para:', {
-        link: selectedLink,
-        dataInicio: startDate,
-        dataFim: endDate
-      });
-      
-      // Buscar todos os relatórios e filtrar no lado do cliente
-      const { data, error } = await supabase
-        .from('bravobet_metricas_diarias')
-        .select('*')
-        .gte('data_formatada', startDate)
-        .lte('data_formatada', endDate);
-      
-      if (error) {
-        throw error;
-      }
-      
-      console.log('Relatórios encontrados no período:', data);
-      
-      // Filtrar por link
-      let relatoriosFiltrados = [];
-      
-      if (data && data.length > 0) {
-        // Primeiro tentamos uma correspondência exata
-        relatoriosFiltrados = data.filter(item => 
-          item.nome_link === selectedLink
-        );
-        
-        // Se não encontrar, tentamos uma correspondência parcial case-insensitive
-        if (relatoriosFiltrados.length === 0) {
-          relatoriosFiltrados = data.filter(item => 
-            item.nome_link && selectedLink &&
-            item.nome_link.toLowerCase().includes(selectedLink.toLowerCase())
-          );
-        }
-      }
-      
-      console.log('Relatórios filtrados por link:', relatoriosFiltrados);
-      
-      if (relatoriosFiltrados.length === 0) {
-        setRelatorio(null);
-      } else {
-        // Agregar os dados de todos os relatórios encontrados
-        const relatorioAgregado = {
-          nome_link: selectedLink,
-          data_formatada: `${startDate} a ${endDate}`,
-          entradas_link: 0,
-          entradas_totais: 0,
-          saidas_link: 0,
-          saidas_totais: 0,
-          created_at: new Date().toISOString()
-        };
-        
-        relatoriosFiltrados.forEach(rel => {
-          relatorioAgregado.entradas_link += rel.entradas_link || 0;
-          relatorioAgregado.entradas_totais += rel.entradas_totais || 0;
-          relatorioAgregado.saidas_link += rel.saidas_link || 0;
-          relatorioAgregado.saidas_totais += rel.saidas_totais || 0;
-        });
-        
-        console.log('Relatório agregado:', relatorioAgregado);
-        setRelatorio(relatorioAgregado);
-      }
-      
-      // Buscar entradas detalhadas da nova tabela
-      await buscarEntradasDetalhadas(startDate, endDate, selectedLink);
-      
-    } catch (error) {
-      console.error('Erro ao buscar relatório:', error.message);
-      setError(`Erro ao buscar relatório: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Função para buscar e agrupar entradas detalhadas
-  const buscarEntradasDetalhadas = async (startDate, endDate, link) => {
-    try {
-      setLoadingEntradas(true);
-      
-      // Buscar todas as entradas da data selecionada
-      const { data: entradasData, error: entradasError } = await supabase
-        .from('bravobet_registro_de_entrada')
-        .select('*')
-        .gte('data_formatada', startDate)
-        .lte('data_formatada', endDate);
-      
-      if (entradasError) {
-        throw entradasError;
-      }
-      
-      console.log('Entradas encontradas:', entradasData);
-      
-      // Filtrar por link se necessário
-      let entradasFiltradas = entradasData;
-      if (link) {
-        entradasFiltradas = entradasData.filter(entrada => 
-          entrada.nome_link === link || entrada.nome_link.toLowerCase().includes(link.toLowerCase())
-        );
-      }
-      
-      // Inicializar objetos para armazenar os agrupamentos
-      const agrupamentosPorCampanha = {};
-      const agrupamentosPorAnuncio = {};
-      const agrupamentosPorPlataforma = {};
-      const agrupamentosPorUrlLp = {};
-      
-      // Processar cada entrada para criar os agrupamentos
-      entradasFiltradas.forEach(entrada => {
-        // Agrupamento por campanha
-        const chaveCampanha = `${entrada.campanha || 'sem_campanha'}-${entrada.conjunto || 'sem_conjunto'}-${entrada.anuncio || 'sem_anuncio'}`;
-        if (!agrupamentosPorCampanha[chaveCampanha]) {
-          agrupamentosPorCampanha[chaveCampanha] = {
-            campanha: entrada.campanha || 'Não informado',
-            conjunto: entrada.conjunto || 'Não informado',
-            anuncio: entrada.anuncio || 'Não informado',
-            quantidade: 0
-          };
-        }
-        agrupamentosPorCampanha[chaveCampanha].quantidade += 1;
-        
-        // Agrupamento por anúncio
-        const chaveAnuncio = entrada.anuncio || 'sem_anuncio';
-        if (!agrupamentosPorAnuncio[chaveAnuncio]) {
-          agrupamentosPorAnuncio[chaveAnuncio] = {
-            anuncio: entrada.anuncio || 'Não informado',
-            quantidade: 0
-          };
-        }
-        agrupamentosPorAnuncio[chaveAnuncio].quantidade += 1;
-        
-        // Agrupamento por plataforma
-        const chavePlataforma = entrada.plataforma || 'sem_plataforma';
-        if (!agrupamentosPorPlataforma[chavePlataforma]) {
-          agrupamentosPorPlataforma[chavePlataforma] = {
-            plataforma: entrada.plataforma || 'Não informado',
-            quantidade: 0
-          };
-        }
-        agrupamentosPorPlataforma[chavePlataforma].quantidade += 1;
-        
-        // Agrupamento por URL LP
-        const chaveUrlLp = entrada.url_lp || 'sem_url_lp';
-        if (!agrupamentosPorUrlLp[chaveUrlLp]) {
-          agrupamentosPorUrlLp[chaveUrlLp] = {
-            url_lp: entrada.url_lp || 'Não informado',
-            quantidade: 0
-          };
-        }
-        agrupamentosPorUrlLp[chaveUrlLp].quantidade += 1;
-      });
-      
-      // Converter para arrays e ordenar por quantidade (decrescente)
-      const porCampanha = Object.values(agrupamentosPorCampanha).sort((a, b) => b.quantidade - a.quantidade);
-      const porAnuncio = Object.values(agrupamentosPorAnuncio).sort((a, b) => b.quantidade - a.quantidade);
-      const porPlataforma = Object.values(agrupamentosPorPlataforma).sort((a, b) => b.quantidade - a.quantidade);
-      const porUrlLp = Object.values(agrupamentosPorUrlLp).sort((a, b) => b.quantidade - a.quantidade);
-      
-      console.log('Entradas agrupadas:', { porCampanha, porAnuncio, porPlataforma, porUrlLp });
-      
-      // Atualizar o estado com os dados agrupados
-      setEntradasDetalhadas({
-        porCampanha,
-        porAnuncio,
-        porPlataforma,
-        porUrlLp
-      });
-      
-    } catch (error) {
-      console.error('Erro ao buscar entradas detalhadas:', error.message);
-      setError(prev => prev ? `${prev}. Erro nas entradas: ${error.message}` : `Erro nas entradas: ${error.message}`);
-    } finally {
-      setLoadingEntradas(false);
-    }
-  };
-
-  // Buscar lista de links para o dropdown
-  useEffect(() => {
-    const fetchLinks = async () => {
-      try {
-        setLoading(true);
-        
-        // Construir a consulta com base no tipo de usuário
-        let query = supabase.from('bravobet_links_personalizados').select('id, nome_link, expert_apelido');
-        
-        // Se não for admin, filtrar apenas os links do usuário
-        if (userType !== 'admin') {
-          query = query.eq('user_id', userId); // Agora é uma string UUID
-        }
-        
-        const { data, error } = await query;
-
-        if (error) throw error;
-        setLinks(data || []);
-      } catch (error) {
-        console.error('Erro ao buscar links:', error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLinks();
-  }, [userType, userId]);
-
-  return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h2>Relatórios Diários</h2>
-      </div>
-
-      <div className="filtros-container">
-        <div className="filtro-grupo">
-          <label className="filtro-label">Link:</label>
-          <select 
-            className="filtro-select"
-            value={selectedLink}
-            onChange={(e) => setSelectedLink(e.target.value)}
-          >
-            <option value="">Selecione um link</option>
-            {links.map((link) => (
-              <option key={link.id} value={link.nome_link}>
-                {link.nome_link} - {link.expert_apelido}
-              </option>
-            ))}
-          </select>
-          <div className="form-instructions">
-            <p>Selecione um link para visualizar o relatório.</p>
-          </div>
-        </div>
-
-        <div className="filtro-grupo">
-          <label className="filtro-label">Data Inicial:</label>
-          <input
-            type="date"
-            className="filtro-input"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-        </div>
-
-        <div className="filtro-grupo">
-          <label className="filtro-label">Data Final:</label>
-          <input
-            type="date"
-            className="filtro-input"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-        </div>
-
-        <div className="filtro-grupo">
-          <label className="filtro-label">Valor Investido:</label>
-          <input
-            type="text"
-            className="filtro-input"
-            value={valorInvestido}
-            onChange={formatarEntradaValor}
-            placeholder="R$ 0,00"
-          />
-        </div>
-
-        <button 
-          className="button"
-          onClick={buscarRelatorio}
-          disabled={loading}
-        >
-          {loading ? 'Buscando...' : 'Buscar Relatório'}
-        </button>
-      </div>
-
-      {error && <div className="error-message">{error}</div>}
-
-      {buscaRealizada && !loading && (
-        <div className="relatorio-container">
-          {relatorio ? (
-            <div className="relatorio-card">
-              <h3>Relatório de {startDate} a {endDate}</h3>
-              <h4>Link: {selectedLink}</h4>
-              
-              <div className="relatorio-stats">
-                <div className="relatorio-stat-grupo">
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Entradas pelo Link:</span>
-                    <span className="stat-value" style={{ color: '#34a853' }}>{relatorio.entradas_link}</span>
-                  </div>
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Entradas Totais:</span>
-                    <span className="stat-value" style={{ color: '#4285F4' }}>{relatorio.entradas_totais}</span>
-                  </div>
-                </div>
-
-                <div className="relatorio-stat-grupo">
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Saídas de Usuários do Link:</span>
-                    <span className="stat-value" style={{ color: '#FBBC05' }}>{relatorio.saidas_link}</span>
-                  </div>
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Saídas Totais:</span>
-                    <span className="stat-value" style={{ color: '#EA4335' }}>{relatorio.saidas_totais}</span>
-                  </div>
-                </div>
-                
-                <div className="relatorio-stat-grupo">
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Data de Registro:</span>
-                    <span className="stat-value">
-                      {new Date(relatorio.created_at).toLocaleDateString('pt-BR')}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Taxa de Conversão */}
-                <div className="relatorio-stat-grupo">
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Taxa de Conversão:</span>
-                    <span className="stat-value" style={{ 
-                      color: relatorio.entradas_totais > 0 
-                        ? '#4285F4' 
-                        : '#757575' 
-                    }}>
-                      {relatorio.entradas_totais > 0 
-                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Contribuição para o Grupo */}
-                <div className="relatorio-stat-grupo">
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Contribuição para o Grupo:</span>
-                    <span className="stat-value" style={{ 
-                      color: relatorio.entradas_totais > 0 
-                        ? getColorByPerformance(
-                          relatorio.entradas_totais > 0 
-                            ? ((relatorio.entradas_link / relatorio.entradas_totais) * 100) 
-                            : 0
-                        ) 
-                        : '#757575'
-                    }}>
-                      {relatorio.entradas_link > 0 && relatorio.entradas_totais > 0
-                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%`
-                        : '0%'}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Valor Investido */}
-                <div className="relatorio-stat-grupo">
-                  <div className="relatorio-stat">
-                    <span className="stat-label">Valor Investido:</span>
-                    <span className="stat-value">{valorInvestido || 'R$ 0,00'}</span>
-                  </div>
-                </div>
-                
-                {/* CPA */}
-                <div className="relatorio-stat-grupo">
-                  <div className="relatorio-stat">
-                    <span className="stat-label">CPA:</span>
-                    <span className="stat-value" style={{ color: cpa !== null ? getColorByCPA(cpa) : '#757575' }}>
-                      {cpa !== null ? formatarValorReais(cpa) : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Gráficos */}
-              <div className="relatorio-graficos">
-                <div className="grafico-section">
-                  <h4>Distribuição de Entradas</h4>
-                  <div className="stats-bar-label">Link: {relatorio.entradas_link}</div>
-                  <div className="stats-bar-container">
-                    <div 
-                      className="stats-bar" 
-                      style={{ 
-                        width: `${relatorio.entradas_totais > 0 
-                          ? (relatorio.entradas_link / relatorio.entradas_totais) * 100 
-                          : 0}%`,
-                        backgroundColor: '#34a853'
-                      }}
-                    >
-                      {relatorio.entradas_totais > 0 && ((relatorio.entradas_link / relatorio.entradas_totais) * 100) > 10
-                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}
-                    </div>
-                  </div>
-                  
-                  <div className="stats-bar-label">Outras Entradas: {relatorio.entradas_totais - relatorio.entradas_link}</div>
-                  <div className="stats-bar-container">
-                    <div 
-                      className="stats-bar" 
-                      style={{ 
-                        width: `${relatorio.entradas_totais > 0 
-                          ? ((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100 
-                          : 0}%`,
-                        backgroundColor: '#4285F4'
-                      }}
-                    >
-                      {relatorio.entradas_totais > 0 && (((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100) > 10
-                        ? `${(((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}
-                    </div>
-                  </div>
-                  
-                  <div className="stats-percentages">
-                    <div className="stats-percentage-item">
-                      <span className="percentage-dot" style={{ backgroundColor: '#34a853' }}></span>
-                      <span>Link: {relatorio.entradas_totais > 0 
-                        ? `${((relatorio.entradas_link / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}</span>
-                    </div>
-                    <div className="stats-percentage-item">
-                      <span className="percentage-dot" style={{ backgroundColor: '#4285F4' }}></span>
-                      <span>Outras: {relatorio.entradas_totais > 0 
-                        ? `${(((relatorio.entradas_totais - relatorio.entradas_link) / relatorio.entradas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grafico-section">
-                  <h4>Comparação de Saídas</h4>
-                  <div className="stats-bar-label">Saídas do Link: {relatorio.saidas_link}</div>
-                  <div className="stats-bar-container">
-                    <div 
-                      className="stats-bar" 
-                      style={{ 
-                        width: `${relatorio.saidas_totais > 0 
-                          ? (relatorio.saidas_link / relatorio.saidas_totais) * 100 
-                          : 0}%`,
-                        backgroundColor: '#FBBC05'
-                      }}
-                    >
-                      {relatorio.saidas_totais > 0 && ((relatorio.saidas_link / relatorio.saidas_totais) * 100) > 10
-                        ? `${((relatorio.saidas_link / relatorio.saidas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}
-                    </div>
-                  </div>
-                  
-                  <div className="stats-bar-label">Outras Saídas: {relatorio.saidas_totais - relatorio.saidas_link}</div>
-                  <div className="stats-bar-container">
-                    <div 
-                      className="stats-bar" 
-                      style={{ 
-                        width: `${relatorio.saidas_totais > 0 
-                          ? ((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100 
-                          : 0}%`,
-                        backgroundColor: '#EA4335'
-                      }}
-                    >
-                      {relatorio.saidas_totais > 0 && (((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100) > 10
-                        ? `${(((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}
-                    </div>
-                  </div>
-                  
-                  <div className="stats-percentages">
-                    <div className="stats-percentage-item">
-                      <span className="percentage-dot" style={{ backgroundColor: '#FBBC05' }}></span>
-                      <span>Link: {relatorio.saidas_totais > 0 
-                        ? `${((relatorio.saidas_link / relatorio.saidas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}</span>
-                    </div>
-                    <div className="stats-percentage-item">
-                      <span className="percentage-dot" style={{ backgroundColor: '#EA4335' }}></span>
-                      <span>Outras: {relatorio.saidas_totais > 0 
-                        ? `${(((relatorio.saidas_totais - relatorio.saidas_link) / relatorio.saidas_totais) * 100).toFixed(2)}%` 
-                        : '0%'}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* CPA Visualization */}
-                {cpa !== null && (
-                  <div className="grafico-section">
-                    <h4>Custo por Aquisição (CPA)</h4>
-                    <div className="cpa-container">
-                      <div className="cpa-bar-container">
-                        <div 
-                          className="cpa-bar" 
-                          style={{ 
-                            width: `${Math.min(100, (cpa / 30) * 100)}%`,
-                            backgroundColor: getColorByCPA(cpa)
-                          }}
-                        >
-                          {formatarValorReais(cpa)}
-                        </div>
-                      </div>
-                      
-                      <div className="cpa-scale">
-                        <span>R$ 0</span>
-                        <span>R$ 10</span>
-                        <span>R$ 20</span>
-                        <span>R$ 30+</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Nova seção: Entradas Detalhadas */}
-              <div className="entradas-detalhadas-section">
-                <h3>Entradas Detalhadas por Campanha</h3>
-                {loadingEntradas ? (
-                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
-                ) : entradasDetalhadas.porCampanha.length > 0 ? (
-                  <div className="entradas-detalhadas-container">
-                    <table className="entradas-table">
-                      <thead>
-                        <tr>
-                          <th>Campanha</th>
-                          <th>Quantidade</th>
-                          <th>%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {entradasDetalhadas.porCampanha.map((entrada, index) => {
-                          // Calcular porcentagem em relação ao total
-                          const totalEntradas = entradasDetalhadas.porCampanha.reduce((sum, item) => sum + item.quantidade, 0);
-                          const porcentagem = totalEntradas > 0 
-                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
-                            : '0.00';
-                            
-                          // Determinar cor com base na porcentagem
-                          const getCorPorcentagem = (valor) => {
-                            if (valor >= 50) return '#34a853'; // Verde - Excelente
-                            if (valor >= 30) return '#4285F4'; // Azul - Bom
-                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
-                            return '#EA4335'; // Vermelho - Baixo
-                          };
-                          
-                          return (
-                            <tr key={index}>
-                              <td>{entrada.campanha}</td>
-                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
-                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
-                                {porcentagem}%
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    
-                    {/* Gráfico de barras para entradas detalhadas */}
-                    <div className="entradas-grafico">
-                      <h4>Distribuição de Entradas por Campanha</h4>
-                      {entradasDetalhadas.porCampanha.slice(0, 5).map((entrada, index) => {
-                        const totalEntradas = entradasDetalhadas.porCampanha.reduce((sum, item) => sum + item.quantidade, 0);
-                        const porcentagem = totalEntradas > 0 
-                          ? ((entrada.quantidade / totalEntradas) * 100)
-                          : 0;
-                          
-                        const cores = ['#34a853', '#4285F4', '#FBBC05', '#EA4335', '#9C27B0'];
-                        
-                        return (
-                          <div key={index} className="grafico-item">
-                            <div className="grafico-label">
-                              {entrada.campanha}
-                            </div>
-                            <div className="stats-bar-container">
-                              <div 
-                                className="stats-bar" 
-                                style={{ 
-                                  width: `${porcentagem}%`,
-                                  backgroundColor: cores[index % cores.length]
-                                }}
-                              >
-                                {porcentagem > 10
-                                  ? `${porcentagem.toFixed(2)}%` 
-                                  : '0%'}
-                              </div>
-                            </div>
-                            <div className="grafico-value">
-                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="no-data-message">
-                    Nenhuma entrada detalhada encontrada para esta data e link.
-                  </div>
-                )}
-              </div>
-              
-              {/* Nova seção: Entradas por Anúncio */}
-              <div className="entradas-detalhadas-section">
-                <h3>Entradas Detalhadas por Anúncio</h3>
-                {loadingEntradas ? (
-                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
-                ) : entradasDetalhadas.porAnuncio.length > 0 ? (
-                  <div className="entradas-detalhadas-container">
-                    <table className="entradas-table">
-                      <thead>
-                        <tr>
-                          <th>Anúncio</th>
-                          <th>Quantidade</th>
-                          <th>%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {entradasDetalhadas.porAnuncio.map((entrada, index) => {
-                          // Calcular porcentagem em relação ao total
-                          const totalEntradas = entradasDetalhadas.porAnuncio.reduce((sum, item) => sum + item.quantidade, 0);
-                          const porcentagem = totalEntradas > 0 
-                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
-                            : '0.00';
-                            
-                          // Determinar cor com base na porcentagem
-                          const getCorPorcentagem = (valor) => {
-                            if (valor >= 50) return '#34a853'; // Verde - Excelente
-                            if (valor >= 30) return '#4285F4'; // Azul - Bom
-                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
-                            return '#EA4335'; // Vermelho - Baixo
-                          };
-                          
-                          return (
-                            <tr key={index}>
-                              <td>{entrada.anuncio}</td>
-                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
-                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
-                                {porcentagem}%
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    
-                    {/* Gráfico de barras para entradas por anúncio */}
-                    <div className="entradas-grafico">
-                      <h4>Distribuição de Entradas por Anúncio</h4>
-                      {entradasDetalhadas.porAnuncio.slice(0, 5).map((entrada, index) => {
-                        const totalEntradas = entradasDetalhadas.porAnuncio.reduce((sum, item) => sum + item.quantidade, 0);
-                        const porcentagem = totalEntradas > 0 
-                          ? ((entrada.quantidade / totalEntradas) * 100)
-                          : 0;
-                          
-                        const cores = ['#4285F4', '#FBBC05', '#EA4335', '#9C27B0', '#00ACC1'];
-                        
-                        return (
-                          <div key={index} className="grafico-item">
-                            <div className="grafico-label">
-                              {entrada.anuncio}
-                            </div>
-                            <div className="stats-bar-container">
-                              <div 
-                                className="stats-bar" 
-                                style={{ 
-                                  width: `${porcentagem}%`,
-                                  backgroundColor: cores[index % cores.length]
-                                }}
-                              >
-                                {porcentagem > 10
-                                  ? `${porcentagem.toFixed(2)}%` 
-                                  : '0%'}
-                              </div>
-                            </div>
-                            <div className="grafico-value">
-                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="no-data-message">
-                    Nenhuma entrada detalhada encontrada para esta data e link.
-                  </div>
-                )}
-              </div>
-              
-              {/* Nova seção: Entradas por Plataforma */}
-              <div className="entradas-detalhadas-section">
-                <h3>Entradas Detalhadas por Plataforma</h3>
-                {loadingEntradas ? (
-                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
-                ) : entradasDetalhadas.porPlataforma.length > 0 ? (
-                  <div className="entradas-detalhadas-container">
-                    <table className="entradas-table">
-                      <thead>
-                        <tr>
-                          <th>Plataforma</th>
-                          <th>Quantidade</th>
-                          <th>%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {entradasDetalhadas.porPlataforma.map((entrada, index) => {
-                          // Calcular porcentagem em relação ao total
-                          const totalEntradas = entradasDetalhadas.porPlataforma.reduce((sum, item) => sum + item.quantidade, 0);
-                          const porcentagem = totalEntradas > 0 
-                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
-                            : '0.00';
-                            
-                          // Determinar cor com base na porcentagem
-                          const getCorPorcentagem = (valor) => {
-                            if (valor >= 50) return '#34a853'; // Verde - Excelente
-                            if (valor >= 30) return '#4285F4'; // Azul - Bom
-                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
-                            return '#EA4335'; // Vermelho - Baixo
-                          };
-                          
-                          return (
-                            <tr key={index}>
-                              <td>{entrada.plataforma}</td>
-                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
-                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
-                                {porcentagem}%
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    
-                    {/* Gráfico de barras para entradas por plataforma */}
-                    <div className="entradas-grafico">
-                      <h4>Distribuição de Entradas por Plataforma</h4>
-                      {entradasDetalhadas.porPlataforma.slice(0, 5).map((entrada, index) => {
-                        const totalEntradas = entradasDetalhadas.porPlataforma.reduce((sum, item) => sum + item.quantidade, 0);
-                        const porcentagem = totalEntradas > 0 
-                          ? ((entrada.quantidade / totalEntradas) * 100)
-                          : 0;
-                          
-                        const cores = ['#FBBC05', '#EA4335', '#9C27B0', '#00ACC1', '#34a853'];
-                        
-                        return (
-                          <div key={index} className="grafico-item">
-                            <div className="grafico-label">
-                              {entrada.plataforma}
-                            </div>
-                            <div className="stats-bar-container">
-                              <div 
-                                className="stats-bar" 
-                                style={{ 
-                                  width: `${porcentagem}%`,
-                                  backgroundColor: cores[index % cores.length]
-                                }}
-                              >
-                                {porcentagem > 10
-                                  ? `${porcentagem.toFixed(2)}%` 
-                                  : '0%'}
-                              </div>
-                            </div>
-                            <div className="grafico-value">
-                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="no-data-message">
-                    Nenhuma entrada detalhada encontrada para esta data e link.
-                  </div>
-                )}
-              </div>
-              
-              {/* Nova seção: Entradas por URL LP */}
-              <div className="entradas-detalhadas-section">
-                <h3>Entradas Detalhadas por URL de Landing Page</h3>
-                {loadingEntradas ? (
-                  <div style={{ textAlign: 'center', padding: '20px' }}>Carregando dados detalhados...</div>
-                ) : entradasDetalhadas.porUrlLp.length > 0 ? (
-                  <div className="entradas-detalhadas-container">
-                    <table className="entradas-table">
-                      <thead>
-                        <tr>
-                          <th>URL Landing Page</th>
-                          <th>Quantidade</th>
-                          <th>%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {entradasDetalhadas.porUrlLp.map((entrada, index) => {
-                          // Calcular porcentagem em relação ao total
-                          const totalEntradas = entradasDetalhadas.porUrlLp.reduce((sum, item) => sum + item.quantidade, 0);
-                          const porcentagem = totalEntradas > 0 
-                            ? ((entrada.quantidade / totalEntradas) * 100).toFixed(2)
-                            : '0.00';
-                            
-                          // Determinar cor com base na porcentagem
-                          const getCorPorcentagem = (valor) => {
-                            if (valor >= 50) return '#34a853'; // Verde - Excelente
-                            if (valor >= 30) return '#4285F4'; // Azul - Bom
-                            if (valor >= 10) return '#FBBC05'; // Amarelo - Regular
-                            return '#EA4335'; // Vermelho - Baixo
-                          };
-                          
-                          return (
-                            <tr key={index}>
-                              <td>{entrada.url_lp}</td>
-                              <td style={{ fontWeight: 'bold', color: '#34a853' }}>{entrada.quantidade}</td>
-                              <td style={{ fontWeight: 'bold', color: getCorPorcentagem(parseFloat(porcentagem)) }}>
-                                {porcentagem}%
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    
-                    {/* Gráfico de barras para entradas por URL LP */}
-                    <div className="entradas-grafico">
-                      <h4>Distribuição de Entradas por URL de Landing Page</h4>
-                      {entradasDetalhadas.porUrlLp.slice(0, 5).map((entrada, index) => {
-                        const totalEntradas = entradasDetalhadas.porUrlLp.reduce((sum, item) => sum + item.quantidade, 0);
-                        const porcentagem = totalEntradas > 0 
-                          ? ((entrada.quantidade / totalEntradas) * 100)
-                          : 0;
-                          
-                        const cores = ['#EA4335', '#9C27B0', '#00ACC1', '#34a853', '#4285F4'];
-                        
-                        return (
-                          <div key={index} className="grafico-item">
-                            <div className="grafico-label">
-                              {entrada.url_lp}
-                            </div>
-                            <div className="stats-bar-container">
-                              <div 
-                                className="stats-bar" 
-                                style={{ 
-                                  width: `${porcentagem}%`,
-                                  backgroundColor: cores[index % cores.length]
-                                }}
-                              >
-                                {porcentagem > 10
-                                  ? `${porcentagem.toFixed(2)}%` 
-                                  : '0%'}
-                              </div>
-                            </div>
-                            <div className="grafico-value">
-                              {entrada.quantidade} ({porcentagem.toFixed(2)}%)
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="no-data-message">
-                    Nenhuma entrada detalhada encontrada para esta data e link.
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="no-data-message">
-              <p>Não há relatório disponível para o link <strong>{selectedLink}</strong> na data <strong>{startDate}</strong> a <strong>{endDate}</strong>.</p>
-              <p>Os relatórios são gerados automaticamente ao final de cada dia.</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // Componente Principal
 const App = () => {
   const [authenticated, setAuthenticated] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [currentTab, setCurrentTab] = useState('dashboard');
+  // eslint-disable-next-line no-unused-vars
+  const [planoStatus, setPlanoStatus] = useState('ativo');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [userData, setUserData] = useState(null);
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
 
-  // Toggle sidebar function
+  // Alternar o estado da barra lateral
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  // Verificar autenticação no IndexedDB ao iniciar
+  // Verificar status do plano no API
+  const verificarStatusPlano = useCallback(async () => {
+    try {
+      // Verificar se o usuário está autenticado
+      const userId = localStorage.getItem('userId');
+      // Não verificar para administradores ou se não estiver logado
+      if (!userId || userType === 'admin') return;
+      
+      console.log('Verificando status do plano no API para o usuário:', userId);
+      
+      // Buscar dados do usuário diretamente do API
+      const { data, error } = await AuthService.getUserStatus(userId);
+      
+      if (error) {
+        console.error('Erro ao verificar status do plano:', error);
+        return;
+      }
+      
+      console.log('Status do plano atual:', data.status_plano);
+      
+      // Atualizar o estado com o status do plano
+      setPlanoStatus(data.status_plano);
+      
+      // Verificar se o período de teste expirou
+      if (data.status_plano === 'teste' && data.data_teste) {
+        const dataFinalTeste = new Date(data.data_teste);
+        const dataAtual = new Date();
+        
+        // Se a data atual for maior que a data final do teste, atualizar status para suspenso
+        if (dataAtual > dataFinalTeste) {
+          console.log('Período de teste expirado. Atualizando status para suspenso.');
+          
+          // Atualizar status no banco de dados
+          const { error: updateError } = await AuthService.updateUserStatus(userId, 'suspenso');
+          
+          if (updateError) {
+            console.error('Erro ao atualizar status do plano:', updateError);
+            return;
+          }
+          
+          // Atualizar estado local
+          setPlanoStatus('suspenso');
+          localStorage.setItem('userPlanStatus', 'suspenso');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status do plano:', error.message);
+    }
+  }, []);
+
+  // Verificar autenticação ao carregar a página
   useEffect(() => {
     const checkAuth = async () => {
-      setLoading(true);
       try {
-        // Inicializar o IndexedDB
-        await initDB();
+        setLoading(true);
         
-        // Verificar se há dados de usuário no IndexedDB
-        const userData = await getUserData();
-        if (userData && userData.uu_id) {
-          setAuthenticated(true);
-          
-          // Atualizar localStorage para compatibilidade com código existente
-          localStorage.setItem('dashboardAuthenticated', 'true');
-          localStorage.setItem('userType', userData.tipo);
-          localStorage.setItem('userId', userData.uu_id);
+        // Verificar se há token no localStorage
+        const token = localStorage.getItem('authToken');
+        console.log('Token encontrado no localStorage:', token ? 'Sim' : 'Não');
+        
+        if (token) {
+          try {
+            console.log('Tentando verificar token com o servidor...');
+            // Verificar se o token é válido fazendo uma requisição ao servidor
+            const userData = await AuthService.checkStatus();
+            console.log('Verificação de token bem-sucedida:', userData);
+            
+            // Atualizar dados do usuário no localStorage
+            localStorage.setItem('dashboardAuthenticated', 'true');
+            localStorage.setItem('userType', userData.user.tipo);
+            localStorage.setItem('userId', userData.user.userId || userData.user.uu_id);
+            localStorage.setItem('userPlanStatus', userData.user.status_plano || 'ativo');
+            
+            // Atualizar o estado da aplicação
+            setUser(userData.user);
+            setAuthenticated(true);
+            
+            // Verificar status do plano no API
+            await verificarStatusPlano();
+          } catch (error) {
+            console.error('Erro ao verificar token:', error);
+            // Limpar dados de autenticação
+            localStorage.removeItem('authToken');
+            sessionStorage.removeItem('authToken');
+            localStorage.removeItem('dashboardAuthenticated');
+            localStorage.removeItem('userType');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('userPlanStatus');
+            localStorage.removeItem('userData');
+            
+            setAuthenticated(false);
+            setUser(null);
+          }
+        } else {
+          console.log('Nenhum token encontrado no localStorage');
+          setAuthenticated(false);
+          setUser(null);
         }
       } catch (error) {
         console.error('Erro ao verificar autenticação:', error);
+        setAuthenticated(false);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
     
-    checkAuth();
-  }, []);
+    // Inicializar o banco de dados IndexedDB
+    initDB().then(() => {
+      checkAuth();
+    });
+  }, [verificarStatusPlano]);
 
-  const handleLogin = (user) => {
+  // Função para lidar com o login
+  const handleLogin = (userData) => {
     setAuthenticated(true);
+    setUser(userData);
   };
-  
+
+  // Função para lidar com o logout
   const handleLogout = async () => {
-    // Limpar dados do IndexedDB
-    await clearUserData();
-    
-    // Limpar localStorage
-    localStorage.removeItem('dashboardAuthenticated');
-    localStorage.removeItem('dashboardUser');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('userId');
-    
-    setAuthenticated(false);
-  };
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    
     try {
-      // Converter o email para minúsculas para evitar problemas de case sensitivity
-      const emailLowerCase = email.toLowerCase();
+      // Limpar dados do usuário no localStorage
+      localStorage.removeItem('dashboardAuthenticated');
+      localStorage.removeItem('dashboardUser');
+      localStorage.removeItem('userType');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('userPlanStatus');
+      localStorage.removeItem('userData');
       
-      console.log("Tentando fazer login com:", emailLowerCase, password);
+      // Limpar dados do IndexedDB
+      await clearUserData();
       
-      // Autenticação via webhook n8n
-      const response = await fetch(N8N_LOGIN_WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: emailLowerCase,
-          senha: password,
-        }),
-      });
-      
-      // Verificar o status da resposta
-      if (response.status === 401) {
-        throw new Error('Credenciais inválidas');
-      }
-      
-      if (!response.ok) {
-        throw new Error('Erro ao fazer login. Tente novamente.');
-      }
-      
-      const responseData = await response.json();
-      console.log("Resposta do webhook:", responseData);
-      
-      // A resposta pode ser um objeto direto ou um array com um objeto
-      let data;
-      
-      if (Array.isArray(responseData)) {
-        if (responseData.length === 0) {
-          throw new Error('Resposta vazia do servidor');
-        }
-        data = responseData[0];
-      } else {
-        // Se for um objeto direto
-        data = responseData;
-      }
-      
-      console.log("Dados processados:", data);
-      
-      // Verificar se temos o uu_id na resposta
-      if (!data.uu_id) {
-        if (data.login === "incorreto") {
-          throw new Error('Credenciais inválidas');
-        }
-        throw new Error('ID de usuário não encontrado na resposta');
-      }
-      
-      // Buscar informações adicionais do usuário no Supabase
-      const { data: userData, error: userError } = await supabase
-        .from('bravobet_users')
-        .select('*')
-        .eq('uu_id', data.uu_id)
-        .single();
-      
-      if (userError) {
-        console.error('Erro ao buscar dados do usuário:', userError);
-        throw new Error('Erro ao buscar dados do usuário');
-      }
-      
-      // Preparar dados para armazenar no localStorage e IndexedDB
-      const userDataToStore = {
-        uu_id: data.uu_id,
-        email: emailLowerCase,
-        tipo: userData.tipo || 'user',
-        nome: userData.nome || ''
-      };
-      
-      // Salvar no IndexedDB
-      await saveUserData(userDataToStore);
-      
-      // Também salvar no localStorage para compatibilidade com o código existente
-      localStorage.setItem('dashboardAuthenticated', 'true');
-      localStorage.setItem('userType', userDataToStore.tipo); // 'admin' ou 'user'
-      localStorage.setItem('userId', userDataToStore.uu_id); // Agora usamos uu_id em vez de id
-      
-      console.log('Login bem-sucedido:');
-      console.log('- UUID do usuário:', userDataToStore.uu_id);
-      console.log('- Tipo do usuário:', userDataToStore.tipo);
-      
-      handleLogin(userDataToStore);
+      // Redirecionar para a página inicial em vez de /login
+      setAuthenticated(false);
+      setUser(null);
+      navigate('/');
     } catch (error) {
-      console.error('Erro ao fazer login:', error.message);
-      setError('Credenciais inválidas ou usuário não autorizado. Tente novamente.');
-    } finally {
-      setLoading(false);
+      console.error('Erro ao fazer logout:', error);
     }
   };
 
-  if (!authenticated) {
+  // Mostrar tela de carregamento enquanto verifica autenticação
+  if (loading) {
     return (
-      <div className="login-container">
-        <div className="login-logo">
-          <img src="/logotipo-branco.png" alt="TrackPro" style={{ maxWidth: '250px', marginBottom: '15px' }} />
-          <p style={{ color: '#555', fontSize: '16px', marginTop: '5px' }}>Dados precisos, decisões inteligentes</p>
-        </div>
-        <div className="login-form-container">
-          <form onSubmit={handleSubmit} className="login-form">
-            {error && <div className="error-message">{error}</div>}
-            
-            <div className="form-group">
-              <label htmlFor="email">Email</label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Digite seu email"
-                required
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="password">Senha</label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Digite sua senha"
-                required
-              />
-            </div>
-            
-            <button 
-              type="submit" 
-              className="login-button" 
-              disabled={loading}
-            >
-              {loading ? 'Entrando...' : 'Entrar'}
-            </button>
-            
-            <div className="signup-link">
-              Novo por aqui? <a href="/cadastro-usuarios">Cadastre-se</a>
-            </div>
-          </form>
-        </div>
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Carregando...</p>
       </div>
     );
   }
 
+  // Se não estiver autenticado, mostrar tela de login
+  if (!authenticated) {
+    return (
+      <div className="app-container">
+        <LoginScreen onLogin={handleLogin} />
+      </div>
+    );
+  }
+
+  // Verificar se o usuário tem plano suspenso ou cancelado
+  const userType = localStorage.getItem('userType');
+  const userPlanStatus = localStorage.getItem('userPlanStatus');
+  // Removemos a verificação do plano bloqueado aqui, pois será tratado apenas no componente Dashboard
+  // const showPlanoBloqueado = userType !== 'admin' && (userPlanStatus === 'suspenso' || userPlanStatus === 'cancelado');
+
+  // Se estiver autenticado, mostrar o dashboard
   return (
     <div className="app-container">
-      {/* Botão do menu lateral */}
-      <button className="sidebar-toggle" onClick={toggleSidebar}>
-        <i className="fas fa-bars"></i>
-      </button>
+      {/* Removemos o banner de plano bloqueado daqui */}
       
-      {/* Menu lateral */}
-      <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
-          <h2>TrackPro</h2>
-          <button className="sidebar-close" onClick={toggleSidebar}>
-            <i className="fas fa-times"></i>
+      <div className="app-content">
+        <div className="dashboard-wrapper">
+          {/* Botão do menu lateral */}
+          <button className="sidebar-toggle" onClick={toggleSidebar}>
+            <i className="fas fa-bars"></i>
           </button>
-        </div>
-        <nav className="sidebar-nav">
-          <button 
-            onClick={() => { 
-              setCurrentTab('dashboard'); 
-              toggleSidebar(); 
-            }} 
-            className={`sidebar-nav-item ${currentTab === 'dashboard' ? 'active' : ''}`}
-          >
-            <i className="fas fa-tachometer-alt"></i>
-            Dashboard
-          </button>
-          <button 
-            onClick={() => { 
-              setCurrentTab('estatisticas'); 
-              toggleSidebar(); 
-            }} 
-            className={`sidebar-nav-item ${currentTab === 'estatisticas' ? 'active' : ''}`}
-          >
-            <i className="fas fa-chart-bar"></i>
-            Estatísticas Gerais
-          </button>
-          <button 
-            onClick={() => { 
-              setCurrentTab('relatorios'); 
-              toggleSidebar(); 
-            }} 
-            className={`sidebar-nav-item ${currentTab === 'relatorios' ? 'active' : ''}`}
-          >
-            <i className="fas fa-file-alt"></i>
-            Relatórios Diários
-          </button>
-          <button 
-            onClick={() => { 
-              setCurrentTab('cadastro'); 
-              toggleSidebar(); 
-            }} 
-            className={`sidebar-nav-item ${currentTab === 'cadastro' ? 'active' : ''}`}
-          >
-            <i className="fas fa-plus-circle"></i>
-            Novo Cadastro
-          </button>
-          {localStorage.getItem('userType') === 'admin' && (
-            <button
-              onClick={() => {
-                navigate('/cadastro-usuarios');
-                toggleSidebar();
-              }}
-              className="sidebar-nav-item"
-            >
-              <i className="fas fa-users"></i>
-              Cadastrar Usuários
-            </button>
-          )}
-          <button
-            className="sidebar-nav-item"
-            onClick={handleLogout}
-            style={{ marginLeft: 'auto' }}
-          >
-            <i className="fas fa-sign-out-alt"></i>
-            Sair
-          </button>
-        </nav>
-        <div className="sidebar-footer">
-          <p>TrackPro v1.0</p>
+          
+          {/* Menu lateral */}
+          <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+            <div className="sidebar-header">
+              <h2>TrackPro</h2>
+              <button className="sidebar-close" onClick={toggleSidebar}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <nav className="sidebar-nav">
+              <button 
+                onClick={() => { 
+                  setCurrentTab('dashboard'); 
+                  toggleSidebar(); 
+                }} 
+                className={`sidebar-nav-item ${currentTab === 'dashboard' ? 'active' : ''}`}
+              >
+                <i className="fas fa-tachometer-alt"></i>
+                Dashboard
+              </button>
+              <button 
+                onClick={() => { 
+                  setCurrentTab('estatisticas-gerais'); 
+                  toggleSidebar(); 
+                }} 
+                className={`sidebar-nav-item ${currentTab === 'estatisticas-gerais' ? 'active' : ''}`}
+              >
+                <i className="fas fa-chart-bar"></i>
+                Estatísticas Gerais
+              </button>
+              <button 
+                onClick={() => { 
+                  setCurrentTab('relatorios-diarios'); 
+                  toggleSidebar(); 
+                }} 
+                className={`sidebar-nav-item ${currentTab === 'relatorios-diarios' ? 'active' : ''}`}
+              >
+                <i className="fas fa-calendar-alt"></i>
+                Relatórios Diários
+              </button>
+              <button 
+                onClick={() => { 
+                  setCurrentTab('cadastro'); 
+                  toggleSidebar(); 
+                }} 
+                className={`sidebar-nav-item ${currentTab === 'cadastro' ? 'active' : ''}`}
+              >
+                <i className="fas fa-plus-circle"></i>
+                Novo Cadastro
+              </button>
+              {localStorage.getItem('userType') === 'admin' && (
+                <button
+                  onClick={() => {
+                    navigate('/cadastro-usuarios');
+                    toggleSidebar();
+                  }}
+                  className="sidebar-nav-item"
+                >
+                  <i className="fas fa-users"></i>
+                  Cadastrar Usuários
+                </button>
+              )}
+              {localStorage.getItem('userType') === 'admin' && (
+                <button
+                  onClick={() => {
+                    setCurrentTab('gerenciamento-usuarios');
+                    toggleSidebar();
+                  }}
+                  className={`sidebar-nav-item ${currentTab === 'gerenciamento-usuarios' ? 'active' : ''}`}
+                >
+                  <i className="fas fa-users-cog"></i>
+                  Gerenciamento de Usuários
+                </button>
+              )}
+              <button
+                className="sidebar-nav-item"
+                onClick={handleLogout}
+              >
+                <i className="fas fa-sign-out-alt"></i>
+                Sair
+              </button>
+            </nav>
+            <div className="sidebar-footer">
+              <p>TrackPro v1.0</p>
+            </div>
+          </div>
+          
+          <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={toggleSidebar}></div>
+          
+          <nav className="nav navbar">
+            <div className="nav-container">
+              <button 
+                className={`nav-button ${currentTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setCurrentTab('dashboard')}
+              >
+                <i className="fas fa-tachometer-alt"></i> Dashboard
+              </button>
+              <button 
+                className={`nav-button ${currentTab === 'estatisticas-gerais' ? 'active' : ''}`}
+                onClick={() => setCurrentTab('estatisticas-gerais')}
+              >
+                <i className="fas fa-chart-bar"></i> Estatísticas Gerais
+              </button>
+              <button 
+                className={`nav-button ${currentTab === 'relatorios-diarios' ? 'active' : ''}`}
+                onClick={() => setCurrentTab('relatorios-diarios')}
+              >
+                <i className="fas fa-calendar-alt"></i> Relatórios Diários
+              </button>
+              <button 
+                className={`nav-button ${currentTab === 'cadastro' ? 'active' : ''}`}
+                onClick={() => setCurrentTab('cadastro')}
+              >
+                <i className="fas fa-plus-circle"></i> Novo Cadastro
+              </button>
+              {localStorage.getItem('userType') === 'admin' && (
+                <button
+                  onClick={() => navigate('/cadastro-usuarios')}
+                  className="nav-button"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <i className="fas fa-users"></i>
+                  Cadastrar Usuários
+                </button>
+              )}
+              {localStorage.getItem('userType') === 'admin' && (
+                <button
+                  onClick={() => setCurrentTab('gerenciamento-usuarios')}
+                  className={`nav-button ${currentTab === 'gerenciamento-usuarios' ? 'active' : ''}`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <i className="fas fa-users-cog"></i>
+                  Gerenciamento de Usuários
+                </button>
+              )}
+              <button
+                className="nav-button"
+                onClick={handleLogout}
+                style={{ marginLeft: 'auto' }}
+              >
+                <i className="fas fa-sign-out-alt"></i>
+                Sair
+              </button>
+            </div>
+          </nav>
+
+          <main className="main-content">
+            {currentTab === 'dashboard' ? (
+              <Dashboard setCurrentTab={setCurrentTab} currentTab={currentTab} />
+            ) : currentTab === 'gerenciamento-usuarios' ? (
+              <GerenciamentoUsuarios />
+            ) : currentTab === 'estatisticas-gerais' ? (
+              <EstatisticasGerais />
+            ) : currentTab === 'relatorios-diarios' ? (
+              <RelatoriosDiarios />
+            ) : (
+              <CadastroForm onCadastroSuccess={() => setCurrentTab('dashboard')} />
+            )}
+          </main>
         </div>
       </div>
-      
-      <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={toggleSidebar}></div>
-    
-      <nav className="nav navbar">
-        <div className="nav-container">
-          <button
-            className={`nav-button ${currentTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('dashboard')}
-          >
-            <i className="fas fa-tachometer-alt"></i>
-            Dashboard
-          </button>
-          <button
-            className={`nav-button ${currentTab === 'estatisticas' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('estatisticas')}
-          >
-            <i className="fas fa-chart-bar"></i>
-            Estatísticas Gerais
-          </button>
-          <button
-            className={`nav-button ${currentTab === 'relatorios' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('relatorios')}
-          >
-            <i className="fas fa-file-alt"></i>
-            Relatórios Diários
-          </button>
-          <button
-            className={`nav-button ${currentTab === 'cadastro' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('cadastro')}
-          >
-            <i className="fas fa-plus-circle"></i>
-            Novo Cadastro
-          </button>
-          {localStorage.getItem('userType') === 'admin' && (
-            <button
-              onClick={() => navigate('/cadastro-usuarios')}
-              className="nav-button"
-              style={{ textDecoration: 'none' }}
-            >
-              <i className="fas fa-users"></i>
-              Cadastrar Usuários
-            </button>
-          )}
-          <button
-            className="nav-button"
-            onClick={handleLogout}
-            style={{ marginLeft: 'auto' }}
-          >
-            <i className="fas fa-sign-out-alt"></i>
-            Sair
-          </button>
-        </div>
-      </nav>
-
-      <main style={{ padding: '20px 0' }}>
-        {currentTab === 'dashboard' ? (
-          <Dashboard setCurrentTab={setCurrentTab} currentTab={currentTab} />
-        ) : currentTab === 'estatisticas' ? (
-          <EstatisticasGerais />
-        ) : currentTab === 'relatorios' ? (
-          <RelatoriosDiarios />
-        ) : (
-          <CadastroForm onCadastroSuccess={() => setCurrentTab('dashboard')} />
-        )}
-      </main>
     </div>
   );
 };

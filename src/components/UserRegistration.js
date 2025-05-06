@@ -2,18 +2,12 @@ import React, { useState, useEffect } from 'react';
 import '../styles/UserRegistration.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { saveUserData } from '../utils/indexedDBUtil';
-import { createClient } from '@supabase/supabase-js';
-
-// Inicialização do cliente Supabase (ainda usado para consultas ao banco de dados)
-const supabase = createClient(
-  'https://apidb.meumenu2023.uk',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzAzMzg2ODAwLAogICJleHAiOiAxODYxMjM5NjAwCn0.kU_d1xlxfuEgkYMC0mYoiZHQpUvRE2EnilTZ7S0bfIM'
-);
+import AuthService from '../services/auth.service';
 
 // URLs dos webhooks n8n
-const N8N_CADASTRO_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/cadastro_trackeador';
+const N8N_CADASTRO_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/register';
 // eslint-disable-next-line no-unused-vars
-const N8N_LOGIN_WEBHOOK_URL = 'https://newhook.meumenu2023.uk/webhook/login-trackeador';
+const N8N_LOGIN_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/login';
 
 const UserRegistration = () => {
   const [loading, setLoading] = useState(false);
@@ -106,7 +100,8 @@ const UserRegistration = () => {
           senha: password, // Alterado para 'senha' conforme nova estrutura
           nome: nome,
           whatsapp: whatsappNumerico, // Enviar apenas os números, sem formatação
-          tipo: 'user' // Tipo sempre será "user" para novos cadastros
+          tipo: 'user', // Tipo sempre será "user" para novos cadastros
+          status_plano: 'teste' // Status inicial para novos usuários
         }),
       });
       
@@ -159,19 +154,6 @@ const UserRegistration = () => {
       // Verificar se temos o uu_id na resposta
       if (!data.uu_id) {
         throw new Error('ID de usuário não encontrado na resposta');
-      }
-      
-      // Buscar informações adicionais do usuário no Supabase para confirmar o cadastro
-      // eslint-disable-next-line no-unused-vars
-      const { data: userData, error: userError } = await supabase
-        .from('bravobet_users')
-        .select('*')
-        .eq('uu_id', data.uu_id)
-        .single();
-      
-      if (userError) {
-        console.error('Erro ao buscar dados do usuário:', userError);
-        // Continuar mesmo com erro, pois o usuário foi criado no webhook
       }
       
       // Preparar dados para armazenar no IndexedDB

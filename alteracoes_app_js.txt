@@ -1,0 +1,107 @@
+### Alterações necessárias no App.js
+
+1. Você já fez as alterações iniciais:
+   - Removeu a importação do createClient
+   - Removeu a inicialização do cliente Supabase
+   - Adicionou as importações dos novos componentes
+
+2. Agora, você precisa remover os seguintes componentes embutidos:
+
+   a) Remova todo o componente Dashboard (linhas 524-1108):
+      ```javascript
+      // Componente de Dashboard
+      const Dashboard = ({ setCurrentTab, currentTab }) => {
+        // ... todo o código do componente ...
+      };
+      ```
+
+   b) Remova todo o componente EstatisticasGerais (linhas 1110-1476):
+      ```javascript
+      // Componente de Estatísticas Gerais
+      const EstatisticasGerais = () => {
+        // ... todo o código do componente ...
+      };
+      ```
+
+   c) Remova todo o componente RelatoriosDiarios (linhas 1478-2432):
+      ```javascript
+      // Componente de Relatórios Diários
+      const RelatoriosDiarios = () => {
+        // ... todo o código do componente ...
+      };
+      ```
+
+3. As referências aos componentes no App.js já estão corretas (por volta da linha 3130):
+   ```javascript
+   <main style={{ padding: '20px 0' }}>
+     {currentTab === 'dashboard' ? (
+       <Dashboard setCurrentTab={setCurrentTab} currentTab={currentTab} />
+     ) : currentTab === 'estatisticas' ? (
+       <EstatisticasGerais />
+     ) : currentTab === 'relatorios' ? (
+       <RelatoriosDiarios />
+     ) : currentTab === 'gerenciamento-usuarios' ? (
+       <GerenciamentoUsuarios />
+     ) : (
+       <CadastroForm onCadastroSuccess={() => setCurrentTab('dashboard')} />
+     )}
+   </main>
+   ```
+
+4. Você também precisa atualizar o método verificarStatusPlano no componente App (por volta da linha 2450) para remover a referência direta ao Supabase:
+
+   Substitua:
+   ```javascript
+   // Buscar dados do usuário diretamente do Supabase
+   const { data: userData, error } = await supabase
+     .from('bravobet_users')
+     .select('*')
+     .eq('uu_id', userId)
+     .single();
+   ```
+
+   Por:
+   ```javascript
+   // Buscar dados do usuário via API
+   const response = await fetch(`${process.env.REACT_APP_API_URL}/users/${userId}`, {
+     headers: {
+       'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+     }
+   });
+   
+   if (!response.ok) {
+     console.error('Erro ao verificar status do plano:', response.statusText);
+     return;
+   }
+   
+   const userData = await response.json();
+   ```
+
+   E substitua:
+   ```javascript
+   // Atualizar status no banco de dados
+   const { error: updateError } = await supabase
+     .from('bravobet_users')
+     .update({ status_plano: 'suspenso' })
+     .eq('uu_id', userId);
+   ```
+
+   Por:
+   ```javascript
+   // Atualizar status via API
+   const updateResponse = await fetch(`${process.env.REACT_APP_API_URL}/users/${userId}`, {
+     method: 'PUT',
+     headers: {
+       'Content-Type': 'application/json',
+       'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+     },
+     body: JSON.stringify({ status_plano: 'suspenso' })
+   });
+   
+   if (!updateResponse.ok) {
+     console.error('Erro ao atualizar status do plano:', updateResponse.statusText);
+     return;
+   }
+   ```
+
+5. Você também precisará criar um serviço para gerenciar usuários (users.service.js) e implementar os endpoints correspondentes na API, mas isso pode ser feito em uma etapa posterior.
