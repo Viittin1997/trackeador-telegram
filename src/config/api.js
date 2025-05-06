@@ -35,7 +35,7 @@ const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, senha: password }),
       });
 
       console.log('Status da resposta:', response.status);
