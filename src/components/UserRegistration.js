@@ -167,33 +167,44 @@ const UserRegistration = () => {
       const responseData = await response.json();
       console.log('Resposta do cadastro:', responseData);
       
-      // A resposta pode ser um objeto direto ou um array com um objeto
-      let data;
+      // Processar a resposta da API
+      let userData;
       
-      if (Array.isArray(responseData)) {
+      if (responseData.user) {
+        // Formato da nova API
+        userData = responseData.user;
+        // Salvar o token JWT no localStorage
+        localStorage.setItem('token', responseData.token);
+        console.log('Token JWT salvo:', responseData.token);
+      } else if (Array.isArray(responseData)) {
+        // Formato antigo (array)
         if (responseData.length === 0) {
           throw new Error('Resposta vazia do servidor');
         }
-        data = responseData[0];
+        userData = responseData[0];
       } else {
-        // Se for um objeto direto
-        data = responseData;
+        // Formato antigo (objeto direto)
+        userData = responseData;
       }
       
-      console.log("Dados processados:", data);
+      console.log("Dados do usuário processados:", userData);
       
       // Verificar se temos o uu_id na resposta
-      if (!data.uu_id) {
+      if (!userData.uu_id && !userData.userId && !userData.id) {
+        console.error('Resposta completa:', responseData);
         throw new Error('ID de usuário não encontrado na resposta');
       }
       
+      // Usar o ID disponível (prioridade: uu_id, userId, id)
+      const userId = userData.uu_id || userData.userId || userData.id;
+      
       // Preparar dados para armazenar no IndexedDB
       const userDataToStore = {
-        uu_id: data.uu_id,
+        uu_id: userId,
         email: email.toLowerCase(),
-        tipo: 'user',
-        nome: nome,
-        whatsapp: whatsapp
+        tipo: userData.tipo || 'user',
+        nome: userData.nome || nome,
+        whatsapp: userData.whatsapp || whatsapp
       };
       
       await saveUserData(userDataToStore);
@@ -201,7 +212,7 @@ const UserRegistration = () => {
       // Também salvar no localStorage para compatibilidade com o código existente
       localStorage.setItem('dashboardAuthenticated', 'true');
       localStorage.setItem('userType', 'user');
-      localStorage.setItem('userId', data.uu_id);
+      localStorage.setItem('userId', userId);
       
       // Sucesso
       setSuccess('Usuário cadastrado com sucesso! Redirecionando para o dashboard...');
