@@ -61,6 +61,13 @@ const UserRegistration = () => {
     }
   }, [location]);
 
+  // Exibir mensagem de erro mais detalhada
+  const displayError = (message) => {
+    console.error('Erro no cadastro:', message);
+    setError(message);
+    setLoading(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -83,6 +90,12 @@ const UserRegistration = () => {
     const whatsappNumerico = whatsapp.replace(/\D/g, '');
     if (whatsappNumerico.length < 10) {
       setError('Número de WhatsApp inválido. Informe DDD + número.');
+      return;
+    }
+
+    // Validar senha (mínimo 6 caracteres)
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
     
@@ -122,15 +135,33 @@ const UserRegistration = () => {
         const errorData = await response.json();
         let errorMessage = 'Erro ao cadastrar usuário';
         
-        if (Array.isArray(errorData) && errorData.length > 0) {
-          errorMessage = errorData[0]?.message || errorMessage;
+        console.log('Erro detalhado:', errorData);
+        
+        // Verificar se há detalhes específicos de validação
+        if (errorData.details && Array.isArray(errorData.details)) {
+          // Extrair mensagens de erro específicas dos detalhes
+          const errorDetails = errorData.details.map(detail => {
+            // Personalizar mensagens de erro para melhor compreensão
+            if (detail.field === "senha" && detail.message.includes("pelo menos 6 caracteres")) {
+              return "A senha deve ter pelo menos 6 caracteres";
+            }
+            if (detail.field === "email" && detail.message.includes("já está em uso")) {
+              return "Este email já está cadastrado. Por favor, use outro email ou faça login.";
+            }
+            return detail.message;
+          });
+          
+          errorMessage = errorDetails.join('. ');
         } else if (errorData.message) {
           errorMessage = errorData.message;
         } else if (errorData.status) {
           errorMessage = `Erro: ${errorData.status}`;
         }
         
-        throw new Error(errorMessage);
+        // Exibir o erro de forma mais amigável
+        setError(errorMessage);
+        setLoading(false);
+        return; // Interromper o fluxo para não continuar com o processamento
       }
       
       const responseData = await response.json();
@@ -188,8 +219,7 @@ const UserRegistration = () => {
       }, 2000);
       
     } catch (error) {
-      console.error('Erro ao cadastrar usuário:', error.message);
-      setError(`Erro ao cadastrar usuário: ${error.message}`);
+      displayError(error.message);
     } finally {
       setLoading(false);
     }
