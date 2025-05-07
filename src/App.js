@@ -11,11 +11,7 @@ import GerenciamentoUsuarios from './components/GerenciamentoUsuarios';
 import EstatisticasGerais from './components/EstatisticasGerais';
 import RelatoriosDiarios from './components/RelatoriosDiarios';
 
-// URLs dos webhooks n8n
-// eslint-disable-next-line no-unused-vars
-const N8N_CADASTRO_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/register';
-// eslint-disable-next-line no-unused-vars
-const N8N_LOGIN_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/login';
+// Componente principal da aplicação
 
 // Componente de Login
 const LoginScreen = ({ onLogin }) => {

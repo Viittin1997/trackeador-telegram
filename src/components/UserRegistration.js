@@ -4,10 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { saveUserData } from '../utils/indexedDBUtil';
 import AuthService from '../services/auth.service';
 
-// URLs dos webhooks n8n
-const N8N_CADASTRO_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/register';
-// eslint-disable-next-line no-unused-vars
-const N8N_LOGIN_WEBHOOK_URL = 'https://apitrack.trackpro.com.br/api/auth/login';
+// URL da API para registro
+const REGISTER_API_URL = 'https://apitrack.trackpro.com.br/api/auth/register';
 
 const UserRegistration = () => {
   const [loading, setLoading] = useState(false);
@@ -102,8 +100,8 @@ const UserRegistration = () => {
     try {
       setLoading(true);
       
-      // Enviar dados para o webhook do n8n para cadastro
-      const response = await fetch(N8N_CADASTRO_WEBHOOK_URL, {
+      // Enviar dados para a API para cadastro
+      const response = await fetch(REGISTER_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
