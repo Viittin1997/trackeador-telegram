@@ -7,7 +7,7 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
     expert_apelido: '',
     group_name: '',
     id_channel_telegram: '',
-    api_token: '',
+    token_api: '',
     pixel_id: '',
     is_external: false,
     ...initialData
@@ -121,8 +121,8 @@ const LinkForm = ({ initialData = {}, onSubmit, buttonText = "Cadastrar" }) => {
         <label className="form-label">Token API do Meta:</label>
         <input
           type="text"
-          name="api_token"
-          value={formData.api_token}
+          name="token_api"
+          value={formData.token_api}
           onChange={handleChange}
           className="form-input"
           placeholder="Token de API do Meta"
